@@ -1,0 +1,51 @@
+# A2: Relation Pattern Coverage Diagnosis (P3)
+# Hypothesis: MIS training samples are 90%+ tool→target pattern;
+#             MIRage cannot generalize to other relation types.
+# Method:
+#   Step 1: GPT-4o annotates MIS-hard for relation types (statistical analysis)
+#   Step 2: Evaluate on Relation Probe (MIS-hard 50 + 150 manually crafted samples)
+# Data: MIS-hard + hand-crafted relation probe (COCO/OpenImages images, hand-written text).
+# Models: InternVL2.5-8B (base) + MIRage.
+
+name: A2_pattern_coverage
+description: "Diagnose single-relation-pattern limitation in MIS: tool→target dominance"
+tags: [prelim, A-experiment, relation-pattern]
+group: prelim
+
+model:
+  name: internvl2_5_8b
+  hf_path: OpenGVLab/InternVL2_5-8B
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: mis_hard_relation_probe
+  # test_path points to the relation probe JSON built by ProbeBuilder
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/results/prelim/probes/relation_type_probe.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test
+  max_test_samples: null
+
+training:
+  enabled: false
+
+inference:
+  backend: vllm
+  benchmarks:
+    - probe_relation_types  # loaded from results/prelim/probes/
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+
+tracking:
+  backend: none

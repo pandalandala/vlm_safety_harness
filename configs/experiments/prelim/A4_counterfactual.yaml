@@ -1,0 +1,52 @@
+# A4: Counterfactual Safety Boundary Diagnosis (P7)
+# Hypothesis: MIRage cannot reliably distinguish harmful image combinations
+#             from counterfactual safe ones (object co-occurrence ≠ causal reasoning).
+# Method: MSSBench paired safe/unsafe samples; compute FPR + Consistency.
+# Data: MSSBench (public benchmark, natural safe/unsafe pairs) + MIS-hard 50 samples.
+# Models: InternVL2.5-8B (base) + MIRage.
+# Key metrics: MSS-Unsafe ASR, MSS-Safe FPR, Pair Consistency.
+
+name: A4_counterfactual
+description: "Diagnose counterfactual safety reasoning failure in MIRage via MSSBench"
+tags: [prelim, A-experiment, counterfactual]
+group: prelim
+
+model:
+  name: internvl2_5_8b
+  hf_path: OpenGVLab/InternVL2_5-8B
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: mssbench
+  # Update this path when MSSBench is downloaded
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench/mssbench.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
+  max_test_samples: null
+
+training:
+  enabled: false
+
+inference:
+  backend: vllm
+  benchmarks:
+    - mssbench_safe     # safe subset → measure FPR
+    - mssbench_unsafe   # unsafe subset → measure ASR
+    - mis_hard          # reference baseline (50 samples sampled in run_prelim.py)
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+
+tracking:
+  backend: none

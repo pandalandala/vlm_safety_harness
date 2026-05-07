@@ -1,0 +1,68 @@
+# Main experiment: DREAMS fine-tuning of InternVL2.5-8B
+# Full SFT with structured CoT labels + diverse relation types + real images.
+
+name: main_dreams_internvl
+description: "InternVL2.5-8B fine-tuned on DREAMS dataset with structured CoT"
+tags: [main, internvl, dreams, full-sft]
+group: main
+
+model:
+  name: internvl2_5_8b
+  hf_path: OpenGVLab/InternVL2_5-8B
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: dreams_main
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
+  max_train_samples: null
+  max_test_samples: null
+
+training:
+  enabled: true
+  backend: llamafactory
+  finetuning_type: full
+  max_gpus: 8
+  use_cot_labels: true
+  cot_format: structured
+  freeze_vision_tower: true
+  freeze_multi_modal_projector: false
+  learning_rate: 1.0e-5
+  num_train_epochs: 3.0
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.1
+  bf16: true
+  cutoff_len: 2048
+  save_steps: 500
+  logging_steps: 10
+
+inference:
+  backend: vllm
+  benchmarks:
+    - mis_easy
+    - mis_hard
+    - mis_real
+    - our_test
+    - mssbench_safe
+    - mssbench_unsafe
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+  output_format: [json, latex]
+
+tracking:
+  backend: none
+  project: dreams_vlm_safety

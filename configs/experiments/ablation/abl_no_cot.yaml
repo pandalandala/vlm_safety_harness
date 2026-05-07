@@ -1,0 +1,15 @@
+# Ablation: remove CoT labels → train with empty assistant responses
+
+name: abl_no_cot
+description: "Ablation: DREAMS training without CoT labels (empty assistant responses)"
+tags: [ablation, no-cot]
+group: ablation
+
+_extends: experiments/main/main_dreams_internvl.yaml
+
+dataset:
+  name: dreams_no_cot
+
+training:
+  use_cot_labels: false
+  cot_format: free_text

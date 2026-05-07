@@ -1,0 +1,49 @@
+# Baseline: MIRage (InternVL2.5-8B + MIS fine-tune) — inference only
+# Used as primary comparison baseline across all benchmarks.
+
+name: main_baseline_mis
+description: "MIRage baseline: InternVL2.5-8B + MIS fine-tune (inference only)"
+tags: [main, baseline, mirage, inference-only]
+group: main
+
+model:
+  name: internvl2_5_8b_mirage
+  # Update to actual MIRage checkpoint path when available
+  hf_path: OpenGVLab/InternVL2_5-8B-MIRage
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: mis_test_all
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test
+
+training:
+  enabled: false
+
+inference:
+  backend: vllm
+  benchmarks:
+    - mis_easy
+    - mis_hard
+    - mis_real
+    - mssbench_safe
+    - mssbench_unsafe
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+  output_format: [json, latex]
+
+tracking:
+  backend: none

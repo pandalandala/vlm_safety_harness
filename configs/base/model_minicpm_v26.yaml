@@ -1,0 +1,6 @@
+name: minicpm_v26
+hf_path: openbmb/MiniCPM-V-2_6
+architecture: minicpm
+size_b: 8.0
+trust_remote_code: true
+max_model_len: 4096

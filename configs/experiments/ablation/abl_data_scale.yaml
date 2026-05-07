@@ -1,0 +1,12 @@
+# Ablation: data scale sensitivity (25% / 50% of DREAMS training data)
+
+name: abl_data_scale_50pct
+description: "Ablation: DREAMS training with 50% of training data"
+tags: [ablation, data-scale]
+group: ablation
+
+_extends: experiments/main/main_dreams_internvl.yaml
+
+dataset:
+  name: dreams_50pct
+  max_train_samples: 8500    # ~50% of ~17K training samples

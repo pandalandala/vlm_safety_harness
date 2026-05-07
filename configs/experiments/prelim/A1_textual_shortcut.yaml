@@ -1,0 +1,52 @@
+# A1: Textual Shortcut Diagnosis (P2)
+# Hypothesis: MIRage's safety gain is partly from text template recognition,
+#             not genuine visual reasoning.
+# Method: Replace both images with 224x224 black frames, keep text unchanged.
+# Data: MIS easy + hard test sets (no DREAMS data).
+# Models: InternVL2.5-8B (base) + MIRage.
+
+name: A1_textual_shortcut
+description: "Diagnose text-only shortcut in MIRage: replace images with black frames"
+tags: [prelim, A-experiment, textual-shortcut]
+group: prelim
+
+model:
+  name: internvl2_5_8b
+  hf_path: OpenGVLab/InternVL2_5-8B
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: mis_easy_hard_text_only
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test
+  text_only_mode: true    # A1 key: replace images with black frames
+  max_test_samples: null
+
+training:
+  enabled: false          # A experiments: no training
+
+inference:
+  backend: vllm
+  benchmarks:
+    - mis_easy            # Condition A: original images (easy)
+    - mis_hard            # Condition A: original images (hard)
+    - probe_text_only     # Condition B: black frames (easy) — from ProbeBuilder
+    - probe_text_only_hard  # Condition B: black frames (hard) — from ProbeBuilder
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+
+tracking:
+  backend: none

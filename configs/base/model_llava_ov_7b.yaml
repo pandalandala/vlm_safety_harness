@@ -1,0 +1,6 @@
+name: llava_ov_7b
+hf_path: llava-hf/llava-onevision-qwen2-7b-ov-hf
+architecture: llava
+size_b: 7.0
+trust_remote_code: false
+max_model_len: 16384

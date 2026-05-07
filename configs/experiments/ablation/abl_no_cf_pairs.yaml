@@ -1,0 +1,13 @@
+# Ablation: train without counterfactual-aware pairs
+
+name: abl_no_cf_pairs
+description: "Ablation: DREAMS training without counterfactual image pairs"
+tags: [ablation, no-cf-pairs]
+group: ablation
+
+_extends: experiments/main/main_dreams_internvl.yaml
+
+dataset:
+  name: dreams_no_cf_pairs
+  # Pre-filtered train set with counterfactual pairs removed
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_no_cf.json

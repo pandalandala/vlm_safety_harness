@@ -1,0 +1,15 @@
+CLAUDE.local.md
+.env
+.claude/settings.json
+.claude/hooks/
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+data_links/
+results/SESSION_STATE.md
+models/
+*.log
+.DS_Store

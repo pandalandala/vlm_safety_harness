@@ -1,0 +1,12 @@
+# Ablation: train only on AI-generated (synthetic) images — no real images
+
+name: abl_synthetic_only
+description: "Ablation: DREAMS training with only AI-generated images (filter out web-retrieved)"
+tags: [ablation, synthetic-only]
+group: ablation
+
+_extends: experiments/main/main_dreams_internvl.yaml
+
+dataset:
+  name: dreams_synthetic_only
+  filter_img_source: AI-generated    # A3 filter: keep only synthetic images

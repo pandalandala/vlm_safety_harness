@@ -1,0 +1,9 @@
+model: gpt-4o
+api_key_env: OPENAI_API_KEY
+max_concurrent_requests: 20
+max_tokens: 128
+temperature: 0.0
+compute_per_category: true
+output_format:
+  - json
+  - latex

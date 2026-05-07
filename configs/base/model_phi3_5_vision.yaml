@@ -1,0 +1,7 @@
+name: phi3_5_vision
+hf_path: microsoft/Phi-3.5-vision-instruct
+architecture: phi
+size_b: 4.2
+trust_remote_code: true
+max_model_len: 4096
+max_dynamic_patch: 4
