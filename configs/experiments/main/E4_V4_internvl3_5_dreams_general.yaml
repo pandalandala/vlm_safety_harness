@@ -1,0 +1,13 @@
+# E4 V4: InternVL3.5-8B + DREAMS + general-data SFT.
+#
+# DISABLED until user supplies general-data mix (same as V2).
+
+name: E4_V4_internvl3_5_dreams_general
+description: "E4 V4 — InternVL3.5-8B + DREAMS + general-data SFT (BLOCKED on user mix)"
+tags: [main, e4, v4, capability, tier_a, blocked]
+group: main
+
+_extends: experiments/main/E4_V3_internvl3_5_dreams.yaml
+
+training:
+  enabled: false   # ← blocked until general-data mix decided.

@@ -1,0 +1,9 @@
+name,hf_path,arch,size_b,trust_remote_code,desc
+kimi_vl_a3b,moonshotai/Kimi-VL-A3B-Instruct,kimi_vl,16.0,true,Kimi-VL-A3B (Tier B 7-9B class)
+minicpm_o_4_5,openbmb/MiniCPM-o-2_6,minicpm_o,8.0,true,MiniCPM-o-2.6 (Tier B 7-9B class — multimodal omni)
+minicpm_v_4_6,openbmb/MiniCPM-V-4_6,minicpm_v_4_6,8.0,true,MiniCPM-V-4.6 (Tier B 7-9B class — latest LF support)
+gemma_4_e4b,google/gemma-3-12b-it,gemma_vlm,12.0,false,Gemma-3-12B-IT (Tier B 7-9B class — vision)
+glm_4_6v_flash,zai-org/GLM-4.6V-Flash,glm4_5v,9.0,true,GLM-4.6V-Flash (Tier B 7-9B class — uses 4.5V template)
+qwen3_5_4b,Qwen/Qwen3.5-4B,qwen3_vl,4.0,false,Qwen3.5-4B (Tier B 4B class)
+internvl3_5_4b,OpenGVLab/InternVL3_5-4B,internvl,4.0,true,InternVL3.5-4B (Tier B 4B class)
+llava_ov_1_5_4b,lmms-lab/LLaVA-OneVision-1.5-4B-Instruct,llava,4.0,false,LLaVA-OV-1.5-4B (Tier B 4B class)

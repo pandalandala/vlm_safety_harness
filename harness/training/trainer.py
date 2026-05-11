@@ -21,17 +21,23 @@ from harness.config.schema import ExperimentConfig, TrainingConfig
 from harness.gpu.allocator import TrainPlan
 
 
-LLAMAFACTORY_ROOT = Path("/mnt/hdd/xuran/LLaMA-Factory")
+LLAMAFACTORY_ROOT = Path("/mnt/hdd/xuran/LlamaFactory")
 CONDA_ENV = "mis_safety"
 
-# Maps our architecture IDs to LLaMA-Factory template names
+# Maps our architecture IDs to LLaMA-Factory template names.
+# Verified against /mnt/hdd/xuran/LlamaFactory/src/llamafactory/data/template.py.
 ARCH_TO_TEMPLATE = {
-    "internvl":  "internvl2_5",
-    "qwen2vl":   "qwen2_vl",
-    "llava":     "llava_next_video",
-    "phi":       "phi",
-    "idefics":   "idefics",
-    "minicpm":   "minicpm_v",
+    "internvl":      "intern_vl",
+    "qwen2vl":       "qwen2_vl",
+    "qwen3_vl":      "qwen3_vl",
+    "llava":         "llava_next",
+    "kimi_vl":       "kimi_vl",
+    "minicpm":       "minicpm_v",
+    "minicpm_v_4_6": "minicpm_v_4_6",
+    "minicpm_o":     "minicpm_o",
+    "gemma_vlm":     "gemma4",
+    "glm4v":         "glm4v",
+    "glm4_5v":       "glm4_5v",
 }
 
 
@@ -144,7 +150,7 @@ class HarnessTrainer:
         }
 
         # Architecture-specific overrides
-        if mc.architecture == "qwen2vl":
+        if mc.architecture in ("qwen2vl", "qwen3_vl"):
             data["image_max_pixels"] = mc.max_pixels or 262144
         if mc.architecture == "internvl" and mc.max_dynamic_patch:
             data["max_dynamic_patch"] = mc.max_dynamic_patch
@@ -167,7 +173,7 @@ class HarnessTrainer:
             "conda", "run", "-n", CONDA_ENV, "--no-capture-output",
             "torchrun",
             f"--nproc_per_node={gpu_plan.num_gpus}",
-            str(self.lf_root / "src" / "train.py"),
+            "-m", "llamafactory.launcher",
             str(yaml_path),
         ]
 

@@ -1,0 +1,62 @@
+# E1/E2/E5 main experiment: LLaVA-OneVision-1.5-8B + DREAMS SFT.
+
+name: main_dreams_llava_ov
+description: "LLaVA-OneVision-1.5-8B fine-tuned on DREAMS dataset with structured CoT"
+tags: [main, llava_ov, dreams, full-sft, tier_a]
+group: main
+
+_extends: base/model_llava_ov_1_5_8b.yaml
+
+model:
+  name: llava_ov_1_5_8b
+  hf_path: lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+  architecture: llava
+  size_b: 8.0
+  trust_remote_code: false
+  max_model_len: 4096
+
+dataset:
+  name: dreams_main_llava_ov
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
+  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+
+training:
+  enabled: true
+  backend: llamafactory
+  finetuning_type: full
+  max_gpus: 8
+  use_cot_labels: true
+  cot_format: structured
+  freeze_vision_tower: true
+  freeze_multi_modal_projector: false
+  learning_rate: 1.0e-5
+  num_train_epochs: 3.0
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.1
+  bf16: true
+  cutoff_len: 2048
+  save_steps: 500
+  logging_steps: 10
+
+inference:
+  backend: lf_vllm
+  benchmarks: [our_test]
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+  concurrency: 16
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  max_concurrent_requests: 20
+  max_tokens: 128
+  temperature: 0.0
+  compute_per_category: true
+  output_format: [json, latex]
+
+tracking:
+  backend: none
+  project: dreams_vlm_safety

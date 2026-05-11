@@ -1,0 +1,14 @@
+# Tier A MIRage-data baseline: Qwen3.5-9B + MIS train data SFT.
+
+name: main_baseline_mirage_data_qwen3_5
+description: "Qwen3.5-9B fine-tuned on MIS train data (Tier A retrained MIRage variant)"
+tags: [main, qwen3_5, mirage_data, full-sft, tier_a]
+group: main
+
+_extends: experiments/main/main_dreams_qwen3_5.yaml
+
+dataset:
+  name: mirage_data_qwen3_5
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/mis_train.json
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train

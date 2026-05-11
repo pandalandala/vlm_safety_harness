@@ -10,9 +10,26 @@ from pydantic import BaseModel, Field
 
 
 class ModelConfig(BaseModel):
-    name: str                          # Short identifier, e.g. "internvl2_5_8b"
+    name: str                          # Short identifier, e.g. "internvl3_5_8b"
     hf_path: str                       # HuggingFace model path or local path
-    architecture: Literal["internvl", "qwen2vl", "llava", "phi", "idefics", "minicpm"]
+    architecture: Literal[
+        # LF-supported VLM architectures (verified against
+        # /mnt/hdd/xuran/LlamaFactory/src/llamafactory/data/template.py).
+        "internvl",
+        "qwen2vl",
+        "qwen3_vl",
+        "llava",
+        "kimi_vl",
+        "minicpm",
+        "minicpm_v_4_6",
+        "minicpm_o",
+        "gemma_vlm",
+        "glm4v",
+        "glm4_5v",
+        # Special placeholder for Tier C closed-source experiments
+        # (no LF training; inference goes through scripts/run_closed_source.py).
+        "closed_source",
+    ]
     size_b: float                      # Model size in billions (used for GPU planning)
     trust_remote_code: bool = True
 
@@ -35,6 +52,13 @@ class DatasetConfig(BaseModel):
     # A-experiment controls (do NOT set for main experiments)
     text_only_mode: bool = False                 # A1: replace images with black frames
     filter_img_source: Optional[str] = None      # A3: "AI-generated" | "Web-retrieved"
+
+    # Main-experiment slicing controls (E1 / E2)
+    filter_harm_type: Optional[Literal["explicit", "implicit"]] = None
+    filter_img_source_type: Optional[Literal["synth", "real", "mix", "unknown"]] = None
+
+    # E5 CF pair index file (built offline by scripts/build_cf_pairs.py)
+    cf_pairs_path: Optional[Path] = None
 
 
 class TrainingConfig(BaseModel):
@@ -62,18 +86,22 @@ class TrainingConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    backend: Literal["vllm", "hf"] = "vllm"
+    backend: Literal["vllm", "hf", "lf_vllm"] = "lf_vllm"
     benchmarks: list[str] = Field(
-        default=["mis_easy", "mis_hard", "mis_real"],
+        default=["our_test"],
         description=(
-            "Supported: mis_easy, mis_hard, mis_real, "
-            "figstep, mssbench_safe, mssbench_unsafe, our_test, "
+            "Supported: mis_easy, mis_hard, mis_real, figstep, "
+            "mssbench_safe, mssbench_unsafe, our_test, "
+            "advbench, safebench, mm_safety, jailbreakv, siuo, mss, "
+            "mmstar, mmmu, muirbench, blink, mmt, "
             "probe_text_only, probe_relation_types"
         ),
     )
     batch_size: int = 32
     temperature: float = 0.0
     max_tokens: int = 1024
+    # LF inference concurrency for ChatModel.achat batching
+    concurrency: int = 16
 
 
 class EvalConfig(BaseModel):

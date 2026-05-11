@@ -1,0 +1,42 @@
+# Cohort definition for run_main.py orchestration.
+# Lists the configs to drive per experiment block.
+
+tier_a_dreams:
+  - main_dreams_internvl3_5.yaml
+  - main_dreams_qwen3_5.yaml
+  - main_dreams_llava_ov.yaml
+
+tier_a_mirage_data:
+  - main_baseline_mirage_data_internvl3_5.yaml
+  - main_baseline_mirage_data_qwen3_5.yaml
+  - main_baseline_mirage_data_llava_ov.yaml
+
+tier_a_base:
+  # base models, no SFT — produced via inference-only run on the same model id
+  # No separate config needed; orchestrator skips train step.
+  - main_dreams_internvl3_5.yaml      # use --skip-train for base inference
+  - main_dreams_qwen3_5.yaml
+  - main_dreams_llava_ov.yaml
+
+tier_b:
+  - main_baseline_kimi_vl_a3b.yaml
+  - main_baseline_minicpm_o_4_5.yaml
+  - main_baseline_minicpm_v_4_6.yaml
+  - main_baseline_gemma_4_e4b.yaml
+  - main_baseline_glm_4_6v_flash.yaml
+  - main_baseline_qwen3_5_4b.yaml
+  - main_baseline_internvl3_5_4b.yaml
+  - main_baseline_llava_ov_1_5_4b.yaml
+
+tier_c_closed_source:
+  # No harness configs; driven by scripts/run_closed_source.py
+  - gpt-5.5
+  - gemini-3.1-pro
+  - claude-opus-4.7
+
+e4_capability:
+  - E4_V0_internvl3_5.yaml
+  - E4_V1_internvl3_5_mirage.yaml
+  - E4_V2_internvl3_5_mirage_general.yaml   # blocked
+  - E4_V3_internvl3_5_dreams.yaml
+  - E4_V4_internvl3_5_dreams_general.yaml   # blocked

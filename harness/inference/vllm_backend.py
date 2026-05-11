@@ -1,16 +1,33 @@
 """
-vLLM inference backend. Per-architecture prompt construction adapted from
+DEPRECATED — kept for backward compatibility with prelim A experiments.
+
+Main experiments + ablations use `harness.inference.lf_backend.LFInferenceBackend`,
+which delegates per-arch prompt formatting to LlamaFactory's mm_plugin templates.
+
+This module's per-arch `_prompt_<arch>` methods are no longer the canonical
+prompt builders. Do NOT add new architectures here — extend
+`harness/training/trainer.py:ARCH_TO_TEMPLATE` instead.
+
+Per-architecture prompt construction adapted from
 /mnt/hdd/xuran/MIS/evaluation/inference_vllm.py (validated parameters).
 """
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 from typing import Optional
 
 from PIL import Image
 
 from harness.inference.model_configs import get_model_config, VLLMModelConfig
+
+warnings.warn(
+    "harness.inference.vllm_backend.VLLMBackend is deprecated. "
+    "Use harness.inference.lf_backend.LFInferenceBackend for new code.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def _open_image(path: str) -> Optional[Image.Image]:

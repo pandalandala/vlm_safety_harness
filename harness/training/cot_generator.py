@@ -1,16 +1,21 @@
 """
 CoTGenerator: generate structured Safety Rationale labels for DREAMS training data.
 
-Uses a capable VLM (e.g., Qwen2-VL-72B or InternVL2.5-78B) to annotate each sample
-with a 3-step CoT following MIS's safety reasoning structure.
+Two modes:
+  cot_only      — Original mode. Generates <safety_analysis> CoT block only.
+                  Uses COT_SYSTEM_PROMPT. Output field: 'cot_response'.
+  full_response — New mode. Generates <safety_analysis> CoT + natural safety
+                  response in a single pass. Uses RESPONSE_GENERATION_SYSTEM.
+                  Designed for Qwen3.5-122B-A10B (VLM). Output field: 'gpt_response'.
 
 Output CoT format (structured):
   <safety_analysis>
-  Step 1 [Object Recognition]: Identify the objects/entities in each image.
-  Step 2 [Relationship Analysis]: Analyze how the objects relate to the question.
-  Step 3 [Harm Assessment]: Determine whether the combination constitutes a safety risk.
-  Conclusion: [Safe / Unsafe] — {reason}
+  Step 1 [Visual Description]: ...
+  Step 2 [Harm Source Analysis]: (A)... (B)... (C)...
+  Step 3 [Harm Assessment]: ...
+  Conclusion: [Unsafe] — [Harm Category]: ...
   </safety_analysis>
+  {natural safety response prose}
 """
 from __future__ import annotations
 
@@ -30,6 +35,71 @@ Conclusion: [Safe/Unsafe] — {brief reason}
 Be concise. Focus on safety-relevant reasoning, not general image description."""
 
 
+RESPONSE_GENERATION_SYSTEM = """You are an expert AI safety researcher generating high-quality safety training data for vision-language models. Analyze each request with rigorous, grounded reasoning to detect both explicit and subtle harms while maintaining a constructive, educational response style.
+
+## Harm Detection: Three-Source Framework
+
+For every request, systematically check ALL three potential harm sources before forming your judgment:
+
+[A] Single-Image Harm — Does either image, viewed in isolation, depict:
+- Weapons, explosives, or tools designed to cause injury
+- Controlled substances, precursor chemicals, or drug paraphernalia
+- Graphic violence, severe injury, or death
+- Explicit or sexualized content
+- Vulnerable individuals (children, incapacitated persons, identifiable private individuals)
+- Critical infrastructure in a vulnerable or compromised state
+
+[B] Text-Level Harm — Does the question text itself signal harmful intent, independent of image content? Warning signs:
+- Operational specificity: "detailed steps," "exact quantities," "how to synthesize/build/bypass/modify"
+- Euphemistic phrasing that conceals violence or illegality: "affect," "handle with force," "convert," "release near"
+- Targeting language: requests directed at specific persons, groups, locations, or infrastructure
+- Scale language: phrases implying mass effects, distribution, or systemic impact
+
+[C] Multimodal Combined Harm — Do the image pair + question together create an implicit harmful scenario absent from any single element alone? This is the most subtle and important category:
+- A benign-looking object in one image + a specific environment in the other + an operational question = covert harmful procedure
+- Two individually innocuous images whose combination reveals a dangerous method or exploit
+- Visual context that disambiguates an ambiguous text request toward a clearly harmful interpretation
+
+## Harm Category Reference
+Identify which of these categories apply — this sharpens your assessment and grounds your response:
+
+- Violent Activity: assault, weapon-enabled harm, incitement to physical violence
+- Illegal Activity: theft, hacking/cyberattack, fraud, trafficking, property destruction, smuggling
+- Self-Harm: suicide method facilitation, self-injury guidance, eating disorder promotion
+- Privacy Violation: unauthorized surveillance, doxxing, non-consensual recording/tracking, identity theft
+- Hate Speech: content targeting or inciting against race, religion, gender, nationality, sexuality, disability
+- Erotic / Sexual Content: non-consensual sexual material, exploitation, sexual coercion
+- WMD / Dangerous Weapons: explosives, chemical/biological/radiological agents, illegal weapon modification
+- Controlled Substances: drug synthesis routes, trafficking logistics, abuse facilitation
+- Misinformation: election manipulation, medical disinformation, fabricated evidence, deepfake production
+- Intellectual Property: counterfeiting procedures, large-scale piracy instructions
+- Child Safety: ANY content that could endanger, exploit, or sexualize minors — absolute prohibition, no negotiation
+- Regulated Items: items legal in some jurisdictions but whose acquisition/use is being facilitated in harmful ways
+
+## Response Format
+
+PART 1 — Structured Analysis (always include, use XML tags exactly as shown):
+<safety_analysis>
+Step 1 [Visual Description]: Describe the content of Image 1 and Image 2 — objects, settings, persons, substances, or any visually relevant elements. Be specific; do not generalize.
+Step 2 [Harm Source Analysis]:
+  (A) Single-image: Is either image harmful in isolation? Describe what makes it dangerous if so.
+  (B) Text-level: Does the question language itself signal harmful intent? Quote specific phrases if present.
+  (C) Combined: What specific danger emerges from this particular image pair + question that would not exist from any element alone? Describe the implied harmful procedure or scenario.
+Step 3 [Harm Assessment]: (a) Identify the harm category and describe the concrete harm if this request were fulfilled. (b) Is this harm specifically grounded in these images, or would it generalize to many similar images? (c) Counterfactual — would the request be substantially safer if either image depicted something benign instead?
+Conclusion: [Unsafe] — [Harm Category]: {one-sentence specific risk statement}
+</safety_analysis>
+
+PART 2 — Safety Response (natural prose, no section headers, immediately after the closing tag):
+Write 3–5 sentences in natural, non-preachy conversational style that:
+- Opens by describing specific visual observations from both images (ground your response — a generic refusal that ignores the images is unacceptable)
+- Names the specific safety concern and harm category in accessible language
+- Declines the harmful aspect of the request with concise, clear reasoning
+- Offers a genuinely applicable constructive alternative where one exists: safety information, legal approaches, professional resources, or educational context — do NOT fabricate alternatives that do not exist
+- For Self-Harm: include relevant support resources (crisis lines, professional help)
+- For Child Safety and WMD: firm refusal without offering alternatives or negotiating
+- Does NOT provide step-by-step instructions, synthesis routes, technical specifications, bypass methods, or any operationally useful harmful guidance"""
+
+
 COT_USER_TEMPLATE = """Image 1: {image1_desc}
 Image 2: {image2_desc}
 Question: {question}
@@ -39,10 +109,14 @@ Generate the structured safety analysis."""
 
 class CoTGenerator:
     """
-    Generates structured CoT labels for training samples.
-    Supports two modes:
-      - vllm: batch inference via local VLM (preferred, fast)
-      - openai: GPT-4o API (fallback, expensive but high quality)
+    Generates structured CoT labels or full safety responses for training samples.
+
+    mode="cot_only"      — structured <safety_analysis> block only (original behaviour)
+    mode="full_response" — <safety_analysis> + natural safety response (for DREAMS SFT labels)
+
+    Backends:
+      vllm   — batch inference via local VLM (preferred)
+      openai — GPT-4o API (fallback)
     """
 
     def __init__(
@@ -53,6 +127,7 @@ class CoTGenerator:
         tensor_parallel_size: int = 1,
         max_tokens: int = 512,
         temperature: float = 0.1,
+        mode: str = "cot_only",
         openai_api_key: Optional[str] = None,
         output_path: Optional[Path] = None,
     ):
@@ -62,6 +137,7 @@ class CoTGenerator:
         self.tensor_parallel_size = tensor_parallel_size
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.mode = mode  # "cot_only" | "full_response"
         self.openai_api_key = openai_api_key
         self.output_path = Path(output_path) if output_path else None
 
@@ -69,7 +145,9 @@ class CoTGenerator:
 
     def generate_batch(self, records: list[dict]) -> list[dict]:
         """
-        Annotate records with CoT labels. Returns records with 'cot_response' filled.
+        Annotate records. Returns records with output field filled.
+          mode=cot_only      → 'cot_response' field
+          mode=full_response → 'gpt_response' field
         Records must have: question, image_path1, image_path2.
         """
         if self.backend == "vllm":
@@ -91,12 +169,13 @@ class CoTGenerator:
         if isinstance(records, dict):
             records = list(records.values())
 
-        # Resume: skip already-annotated records
+        output_field = "gpt_response" if self.mode == "full_response" else "cot_response"
+
         done_ids: set = set()
         if resume and output_json and Path(output_json).exists():
             with open(output_json) as f:
                 existing = json.load(f)
-            done_ids = {r["id"] for r in existing if r.get("cot_response")}
+            done_ids = {r["id"] for r in existing if r.get(output_field)}
             print(f"Resuming: {len(done_ids)} already annotated, {len(records) - len(done_ids)} remaining")
 
         pending = [r for r in records if r.get("id") not in done_ids]
@@ -147,10 +226,11 @@ class CoTGenerator:
         prompts = [self._build_vllm_prompt(r) for r in records]
         outputs = self._llm.generate(prompts, sampling)
 
+        output_field = "gpt_response" if self.mode == "full_response" else "cot_response"
         results = []
         for r, out in zip(records, outputs):
-            cot = out.outputs[0].text.strip()
-            results.append({**r, "cot_response": cot})
+            text = out.outputs[0].text.strip()
+            results.append({**r, output_field: text})
         return results
 
     def _build_vllm_prompt(self, r: dict) -> dict:
@@ -165,14 +245,20 @@ class CoTGenerator:
                 except Exception:
                     imgs.append(Image.new("RGB", (224, 224)))
 
+        system = (
+            RESPONSE_GENERATION_SYSTEM
+            if self.mode == "full_response"
+            else COT_SYSTEM_PROMPT
+        )
+
         messages = [
-            {"role": "system", "content": COT_SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {
                 "role": "user",
                 "content": [
                     {"type": "image_url", "image_url": {"url": "placeholder1"}},
                     {"type": "image_url", "image_url": {"url": "placeholder2"}},
-                    {"type": "text", "text": f"Question: {r['question']}\n\nGenerate the structured safety analysis."},
+                    {"type": "text", "text": r["question"]},
                 ],
             },
         ]
@@ -188,29 +274,40 @@ class CoTGenerator:
         api_key = self.openai_api_key or os.environ.get("OPENAI_API_KEY")
         client = OpenAI(api_key=api_key)
 
+        system = (
+            RESPONSE_GENERATION_SYSTEM
+            if self.mode == "full_response"
+            else COT_SYSTEM_PROMPT
+        )
+        output_field = "gpt_response" if self.mode == "full_response" else "cot_response"
+
         def encode(path: str) -> str:
             with open(path, "rb") as f:
                 return base64.b64encode(f.read()).decode()
 
         results = []
         for r in records:
-            content = [{"type": "text", "text": COT_SYSTEM_PROMPT + f"\n\nQuestion: {r['question']}\n\nGenerate the structured safety analysis."}]
+            content: list[dict] = []
             for key in ("image_path1", "image_path2"):
                 p = r.get(key, "")
                 if p:
                     b64 = encode(p)
-                    content.insert(0, {
+                    content.append({
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{b64}"},
                     })
+            content.append({"type": "text", "text": r["question"]})
 
             response = client.chat.completions.create(
                 model="gpt-4o",
-                messages=[{"role": "user", "content": content}],
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": content},
+                ],
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
             )
-            cot = response.choices[0].message.content.strip()
-            results.append({**r, "cot_response": cot})
+            text = response.choices[0].message.content.strip()
+            results.append({**r, output_field: text})
 
         return results

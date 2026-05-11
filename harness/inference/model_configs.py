@@ -78,6 +78,17 @@ ARCH_CONFIGS: dict[str, VLLMModelConfig] = {
         max_num_seqs=5,
         gpu_memory_utilization=0.9,
     ),
+    # Qwen3.5-VL MoE family (122B-A10B etc.) — needs all 8 GPUs at BF16
+    "qwen3_5_vl": VLLMModelConfig(
+        trust_remote_code=False,
+        max_model_len=4096,
+        max_num_seqs=4,
+        gpu_memory_utilization=0.85,
+        mm_processor_kwargs={
+            "min_pixels": 200704,   # 448×448
+            "max_pixels": 1003520,  # same ceiling as Qwen2.5-VL
+        },
+    ),
 }
 
 

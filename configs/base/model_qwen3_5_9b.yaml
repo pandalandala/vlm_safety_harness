@@ -1,0 +1,8 @@
+name: qwen3_5_9b
+hf_path: Qwen/Qwen3.5-9B
+architecture: qwen3_vl
+size_b: 9.0
+trust_remote_code: false
+max_model_len: 8192
+min_pixels: 200704
+max_pixels: 1003520

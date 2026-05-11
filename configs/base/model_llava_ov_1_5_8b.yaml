@@ -1,0 +1,6 @@
+name: llava_ov_1_5_8b
+hf_path: lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+architecture: llava
+size_b: 8.0
+trust_remote_code: false
+max_model_len: 4096

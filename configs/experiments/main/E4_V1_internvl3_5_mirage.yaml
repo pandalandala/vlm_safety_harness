@@ -1,0 +1,16 @@
+# E4 V1: InternVL3.5-8B + MIRage-data SFT — capability after MIRage SFT.
+
+name: E4_V1_internvl3_5_mirage
+description: "E4 V1 — InternVL3.5-8B + MIRage-data SFT capability eval"
+tags: [main, e4, v1, capability, tier_a]
+group: main
+
+_extends: experiments/main/main_baseline_mirage_data_internvl3_5.yaml
+
+inference:
+  backend: lf_vllm
+  benchmarks: [mmstar, mmmu, muirbench, blink, mmt]
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+  concurrency: 16

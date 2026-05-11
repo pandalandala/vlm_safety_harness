@@ -1,0 +1,7 @@
+name: internvl3_5_8b
+hf_path: OpenGVLab/InternVL3_5-8B
+architecture: internvl
+size_b: 8.0
+trust_remote_code: true
+max_model_len: 8192
+max_dynamic_patch: 4

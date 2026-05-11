@@ -3,8 +3,8 @@ InferenceEngine: unified entry for running inference across all benchmarks.
 
 Orchestrates:
   - Benchmark loading
-  - VLLMBackend initialization with InferPlan GPU settings
-  - Batch inference with progress tracking
+  - LFInferenceBackend initialization with InferPlan GPU settings
+  - Batch inference (async via ChatModel.achat)
   - JSONL output per benchmark
   - Resume support
 """
@@ -16,17 +16,37 @@ from typing import Optional
 
 from harness.config.schema import ExperimentConfig, InferenceConfig
 from harness.gpu.allocator import InferPlan
-from harness.inference.vllm_backend import VLLMBackend
+from harness.inference.lf_backend import LFInferenceBackend
+from harness.training.trainer import ARCH_TO_TEMPLATE
 
-# Benchmark name → loader function
+# Benchmark name → loader spec.
+# Strings prefixed with "_" are special-cased in `_load_benchmark`.
 BENCHMARK_REGISTRY: dict[str, str] = {
+    # MIS test sets
     "mis_easy":   "harness.data.benchmarks.mis_benchmark.MISBenchmark",
     "mis_hard":   "harness.data.benchmarks.mis_benchmark.MISBenchmark",
     "mis_real":   "harness.data.benchmarks.mis_benchmark.MISBenchmark",
+    # MSSBench
     "mssbench_safe":   "harness.data.benchmarks.mssbench.MSSBenchmark",
     "mssbench_unsafe": "harness.data.benchmarks.mssbench.MSSBenchmark",
+    "mss":             "harness.data.benchmarks.mssbench.MSSBenchmark",
+    # Existing safety bench
     "figstep":    "harness.data.benchmarks.figstep.FigStepBenchmark",
+    # Phase 4 — new safety
+    "advbench":   "harness.data.benchmarks.advbench.AdvBenchBenchmark",
+    "safebench":  "harness.data.benchmarks.safebench.SafeBenchBenchmark",
+    "mm_safety":  "harness.data.benchmarks.mm_safety.MMSafetyBenchmark",
+    "jailbreakv": "harness.data.benchmarks.jailbreakv.JailbreakVBenchmark",
+    "siuo":       "harness.data.benchmarks.siuo.SIUOBenchmark",
+    # Phase 4 — capability
+    "mmstar":     "harness.data.benchmarks.mmstar.MMStarBenchmark",
+    "mmmu":       "harness.data.benchmarks.mmmu.MMMUBenchmark",
+    "muirbench":  "harness.data.benchmarks.muirbench.MuirBenchBenchmark",
+    "blink":      "harness.data.benchmarks.blink.BLINKBenchmark",
+    "mmt":        "harness.data.benchmarks.mmt.MMTBenchmark",
+    # DREAMS test (with E1/E2 slicing)
     "our_test":   "_our_test",
+    # A-experiment probes (kept for backward compat)
     "probe_text_only":      "_probe",
     "probe_text_only_hard": "_probe",
     "probe_relation_types": "_probe",
@@ -48,7 +68,7 @@ class InferenceEngine:
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
 
-        self._backend: Optional[VLLMBackend] = None
+        self._backend: Optional[LFInferenceBackend] = None
 
     def run_all_benchmarks(
         self,
@@ -85,15 +105,23 @@ class InferenceEngine:
     def _init_backend(self) -> None:
         mc = self.cfg.model
         ic: InferenceConfig = self.cfg.inference
-        self._backend = VLLMBackend(
+
+        template = ARCH_TO_TEMPLATE.get(mc.architecture)
+        if template is None:
+            raise ValueError(
+                f"No LF template registered for architecture '{mc.architecture}'. "
+                f"Update ARCH_TO_TEMPLATE in harness/training/trainer.py."
+            )
+
+        self._backend = LFInferenceBackend(
             model_path=self.model_path,
-            architecture=mc.architecture,
-            tensor_parallel_size=self.infer_plan.tensor_parallel_size,
-            gpu_ids=self.infer_plan.gpu_ids,
-            max_model_len=mc.max_model_len,
-            gpu_memory_utilization=self.infer_plan.gpu_memory_utilization,
+            template=template,
+            infer_plan=self.infer_plan,
+            max_new_tokens=ic.max_tokens,
             temperature=ic.temperature,
-            max_tokens=ic.max_tokens,
+            max_model_len=mc.max_model_len,
+            concurrency=ic.concurrency,
+            trust_remote_code=mc.trust_remote_code,
         )
         self._backend.load()
 

@@ -42,6 +42,10 @@ Gemini-3.1-Pro
 
 Claude-Opus-4.7
 
+### Annotator / Response Generator Models
+
+https://huggingface.co/Qwen/Qwen3.5-122B-A10B
+
 ### MIRage Checkpoints
 
 https://huggingface.co/Tuwhy/Qwen2-VL-7B-MIRage

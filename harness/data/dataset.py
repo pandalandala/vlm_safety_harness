@@ -1,6 +1,19 @@
 """
 Unified dataset loader for DREAMS and MIS data formats.
 Supports training (with CoT responses) and evaluation (response-free) modes.
+
+Two on-disk record schemas are accepted:
+
+A) DREAMS train.json / scored.json — sharegpt with CoT response:
+   {id, category, sub_category, conversations[2], image[2], img_source, vlm_score}
+
+B) DREAMS test.json — flat eval format:
+   {id, category, sub_category, question, image_path1, image_path2,
+    path_name, img1_source, img2_source, harm_type}
+
+`__getitem__` normalizes both shapes into a single dict.
+`derive_img_source_type` maps the (img1_source, img2_source) pair into
+{synth, real, mix, unknown} for E2 slicing.
 """
 from __future__ import annotations
 
@@ -9,6 +22,37 @@ from pathlib import Path
 from typing import Iterator, Literal, Optional
 
 from PIL import Image
+
+
+_SYNTH_TOKENS = {"AI-generated", "SD-3.5", "Stable Diffusion", "synth", "synthetic"}
+_REAL_TOKENS = {"Web-crawled", "Web-retrieved", "local", "web", "real"}
+
+
+def derive_img_source_type(record: dict) -> Literal["synth", "real", "mix", "unknown"]:
+    """
+    Rule-based mapping of (img1_source, img2_source) to a single coarse label.
+
+    Both synth → synth; both real → real; one of each → mix; otherwise unknown.
+    Falls back to single `img_source` field for DREAMS train.json schema.
+    """
+    a = record.get("img1_source") or ""
+    b = record.get("img2_source") or ""
+    if not (a or b):
+        single = record.get("img_source") or ""
+        a = b = single
+
+    is_synth_a = a in _SYNTH_TOKENS
+    is_synth_b = b in _SYNTH_TOKENS
+    is_real_a = a in _REAL_TOKENS
+    is_real_b = b in _REAL_TOKENS
+
+    if is_synth_a and is_synth_b:
+        return "synth"
+    if is_real_a and is_real_b:
+        return "real"
+    if (is_synth_a and is_real_b) or (is_real_a and is_synth_b):
+        return "mix"
+    return "unknown"
 
 
 class HarnessDataset:
@@ -38,6 +82,8 @@ class HarnessDataset:
         max_samples: Optional[int] = None,
         categories: Optional[list[str]] = None,
         filter_img_source: Optional[str] = None,
+        filter_harm_type: Optional[Literal["explicit", "implicit"]] = None,
+        filter_img_source_type: Optional[Literal["synth", "real", "mix", "unknown"]] = None,
         text_only_mode: bool = False,
         blank_image_path: Optional[Path] = None,
     ):
@@ -59,7 +105,18 @@ class HarnessDataset:
             raw = [r for r in raw if r.get("category", "").upper() in categories_upper]
 
         if filter_img_source:
-            raw = [r for r in raw if filter_img_source.lower() in r.get("img_source", "").lower()]
+            raw = [
+                r for r in raw
+                if filter_img_source.lower() in r.get("img_source", "").lower()
+                or filter_img_source.lower() in r.get("img1_source", "").lower()
+                or filter_img_source.lower() in r.get("img2_source", "").lower()
+            ]
+
+        if filter_harm_type:
+            raw = [r for r in raw if r.get("harm_type") == filter_harm_type]
+
+        if filter_img_source_type:
+            raw = [r for r in raw if derive_img_source_type(r) == filter_img_source_type]
 
         if max_samples:
             raw = raw[:max_samples]
@@ -79,6 +136,8 @@ class HarnessDataset:
             max_samples=cfg_dataset.max_train_samples if mode == "train" else cfg_dataset.max_test_samples,
             categories=cfg_dataset.categories,
             filter_img_source=cfg_dataset.filter_img_source,
+            filter_harm_type=cfg_dataset.filter_harm_type,
+            filter_img_source_type=cfg_dataset.filter_img_source_type,
             text_only_mode=cfg_dataset.text_only_mode,
         )
 
@@ -111,6 +170,11 @@ class HarnessDataset:
             "category": r.get("category", ""),
             "sub_category": r.get("sub_category", ""),
             "img_source": r.get("img_source", ""),
+            "img1_source": r.get("img1_source", ""),
+            "img2_source": r.get("img2_source", ""),
+            "img_source_type": derive_img_source_type(r),
+            "harm_type": r.get("harm_type", ""),
+            "path_name": r.get("path_name", ""),
             "vlm_score": r.get("vlm_score", -1),
             "cot_response": cot_response,
         }
@@ -140,7 +204,8 @@ class HarnessDataset:
         return dist
 
     def to_eval_records(self) -> list[dict]:
-        """Return list of dicts suitable for vLLM batch inference input."""
+        """Return list of dicts suitable for batch inference input.
+        Includes harm_type and img_source_type for E1/E2 slicing."""
         records = []
         for i in range(len(self)):
             item = self[i]
@@ -150,6 +215,11 @@ class HarnessDataset:
                 "image_path1": item["image_path1"],
                 "image_path2": item["image_path2"],
                 "category": item["category"],
+                "sub_category": item.get("sub_category", ""),
+                "img_source": item.get("img_source", ""),
+                "img_source_type": item["img_source_type"],
+                "harm_type": item["harm_type"],
+                "path_name": item.get("path_name", ""),
             })
         return records
 
@@ -163,7 +233,12 @@ class HarnessDataset:
         return r.get("text_prompt", r.get("question", ""))
 
     def _resolve_image_paths(self, r: dict) -> list[Path]:
-        images = r.get("image", [])
+        # Schema A (DREAMS train.json): "image" → list of paths
+        # Schema B (DREAMS test.json): "image_path1" / "image_path2" → strings
+        images = r.get("image")
+        if not images:
+            images = [p for p in (r.get("image_path1"), r.get("image_path2")) if p]
+
         resolved = []
         for img in images:
             p = Path(img)
@@ -171,10 +246,7 @@ class HarnessDataset:
                 resolved.append(p)
             else:
                 candidate = self.image_root / img
-                if candidate.exists():
-                    resolved.append(candidate)
-                else:
-                    resolved.append(candidate)  # Keep path even if not found yet
+                resolved.append(candidate)  # Keep path even if not found
         return resolved
 
     def _get_blank_image(self) -> Image.Image:

@@ -1,0 +1,38 @@
+# E4 V0: InternVL3.5-8B base (no SFT) — capability anchor.
+
+name: E4_V0_internvl3_5_base
+description: "E4 V0 — InternVL3.5-8B base (no SFT) capability eval"
+tags: [main, e4, v0, capability, tier_a]
+group: main
+
+_extends: base/model_internvl3_5_8b.yaml
+
+model:
+  name: internvl3_5_8b
+  hf_path: OpenGVLab/InternVL3_5-8B
+  architecture: internvl
+  size_b: 8.0
+  trust_remote_code: true
+  max_model_len: 8192
+  max_dynamic_patch: 4
+
+dataset:
+  name: e4_v0_capability
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
+
+training:
+  enabled: false
+
+inference:
+  backend: lf_vllm
+  benchmarks: [mmstar, mmmu, muirbench, blink, mmt]
+  batch_size: 32
+  temperature: 0.0
+  max_tokens: 1024
+  concurrency: 16
+
+evaluation:
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  output_format: [json, latex]

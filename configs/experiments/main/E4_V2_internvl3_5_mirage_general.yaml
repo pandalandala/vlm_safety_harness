@@ -1,0 +1,20 @@
+# E4 V2: InternVL3.5-8B + MIRage-data + general-data SFT.
+#
+# DISABLED until user supplies general-data mix (ratio + source).
+# scripts/run_capability.py refuses to launch V2 unless dataset.general_data
+# block is populated. See docs/main_experiments/initial_framework_plan_v3_llamafactory.md §5.
+
+name: E4_V2_internvl3_5_mirage_general
+description: "E4 V2 — InternVL3.5-8B + MIRage-data + general-data SFT (BLOCKED on user mix)"
+tags: [main, e4, v2, capability, tier_a, blocked]
+group: main
+
+_extends: experiments/main/E4_V1_internvl3_5_mirage.yaml
+
+training:
+  enabled: false   # ← blocked. Flip to true after general-data mix is decided.
+  # General data mix placeholder — populate before unblocking:
+  # general_data:
+  #   sources: [ShareGPT4V, LLaVA-OneVision-Data]
+  #   ratio: {dreams: 1.0, general: 0.5}
+  #   total_samples: 22500

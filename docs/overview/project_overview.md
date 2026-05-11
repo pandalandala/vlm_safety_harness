@@ -36,9 +36,23 @@ MIS weaknesses (A1-A4 diagnosis)
 │   └── docs/                   # MIS paper notes + shortcomings analysis
 │
 ├── docs/                        # ← Project documentation
-│   ├── project_overview.md      # This file
-│   ├── A_experiments.md         # A1-A4 detailed design
-│   └── session_outputs/         # Per-session response archives
+│   ├── overview/                # Project overview + model roster
+│   │   ├── project_overview.md  # This file
+│   │   └── Models_List.md       # Full model roster
+│   ├── dataset/                 # Dataset construction + annotation plans
+│   │   ├── dataset_construction_plan.md
+│   │   ├── testset_annotation_plan.md
+│   │   └── response_generation_plan.md
+│   ├── prelim_experiments/      # A1-A4 diagnostic experiments
+│   │   ├── A_experiments.md
+│   │   ├── A_experiments_handoff.md
+│   │   ├── A_experiments_run_guide.md
+│   │   └── result_tables.md
+│   ├── main_experiments/        # Main SFT experiments
+│   │   └── main_experiments_handoff.md
+│   ├── ablation_experiments/    # Ablation study designs
+│   ├── session_outputs/         # Per-session response archives
+│   └── archive/                 # Historical/superseded plans
 │
 ├── logs/                        # Command execution logs (per-session)
 │
@@ -271,3 +285,48 @@ Same config = skip re-run (override with `--force`).
 | `/mnt/hdd/xuran/docs/MIS_shortcomes_analysis_final_version.md` | MIS weakness analysis |
 | `.claude/docs/MIS_paper_notes.md` | MIS paper notes (OCR) |
 | `docs/A_experiments.md` | A1-A4 detailed design |
+
+---
+
+## 13. Doc Index
+
+| Doc | Folder | Topic |
+|-----|--------|-------|
+| `project_overview.md` | `overview/` | This file — canonical project plan + current state |
+| `Models_List.md` | `overview/` | Full model roster (open + closed source) |
+| `dataset_construction_plan.md` | `dataset/` | DREAMS dataset filtering/scoring/splitting plan (v2) |
+| `testset_annotation_plan.md` | `dataset/` | Test set 2-label annotation plan (harm_visibility + img_type) |
+| `response_generation_plan.md` | `dataset/` | CoT + safety response generation for DREAMS train.json |
+| `A_experiments.md` | `prelim_experiments/` | A1-A4 design, hypotheses, data sources, expected findings |
+| `A_experiments_handoff.md` | `prelim_experiments/` | Self-contained handoff for new agent running A experiments |
+| `A_experiments_run_guide.md` | `prelim_experiments/` | Operational run-book for A experiments |
+| `result_tables.md` | `prelim_experiments/` | Blank result tables for A experiments (consolidated) |
+| `main_experiments_handoff.md` | `main_experiments/` | Handoff for agent implementing main SFT experiments code |
+| `session_outputs/` | — | Per-session response archives |
+| `archive/` | — | Historical/superseded plans (kept for reference) |
+
+---
+
+## 14. Implementation Phases (from v3 plan)
+
+Engineering build-out order with per-phase verification:
+
+| Phase | Module | Key files | Verification |
+|-------|--------|-----------|-------------|
+| 1 | Project skeleton | Directory tree, `CLAUDE.md`, `.claude/` config | `ls -la .claude/` |
+| 2 | GPU allocator | `harness/gpu/allocator.py` | `python harness/gpu/allocator.py --status` |
+| 3 | Config system | `harness/config/schema.py`, `loader.py`, `registry.py` | `ConfigLoader.load(...)` smoke test |
+| 4 | Data layer | `harness/data/dataset.py`, `converters.py`, `probe_builder.py` | `HarnessDataset.from_json(...)` smoke test |
+| 5 | Inference | `harness/inference/vllm_backend.py`, `scripts/run_inference_only.py` | `--limit 5` smoke run |
+| 6 | Evaluation | `harness/evaluation/gpt4o_evaluator.py`, `scripts/run_eval_only.py` | Eval on a small JSONL |
+| 7 | Training | `harness/training/trainer.py`, `cot_generator.py` | `--dry-run` |
+| 8 | A experiments | `scripts/run_prelim.py` | `--experiment A1 --limit 10` |
+| 9 | Integration + reports | `scripts/run_experiment.py`, `generate_report.py` | End-to-end run on one config |
+
+Phases 1-9 complete. Current work focuses on data-side blockers (CoT, MIRage checkpoint, MSSBench) — see Section 11.
+
+---
+
+## 15. Historical Notes
+
+Full v3 design specs (`.claude/` config snippets, harness module pseudocode, original A-experiment narrative drafts) are archived at `docs/archive/v3_full_design_spec.md`. Refer to it only when the current state diverges from documented behavior — actual code in `harness/` is authoritative.

@@ -1,0 +1,14 @@
+# Tier A MIRage-data baseline: LLaVA-OneVision-1.5-8B + MIS train data SFT.
+
+name: main_baseline_mirage_data_llava_ov
+description: "LLaVA-OneVision-1.5-8B fine-tuned on MIS train data (Tier A retrained MIRage variant)"
+tags: [main, llava_ov, mirage_data, full-sft, tier_a]
+group: main
+
+_extends: experiments/main/main_dreams_llava_ov.yaml
+
+dataset:
+  name: mirage_data_llava_ov
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/mis_train.json
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train
