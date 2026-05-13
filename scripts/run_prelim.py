@@ -74,44 +74,56 @@ def parse_args() -> argparse.Namespace:
                    help="Build probe datasets only (A1 black frames, A2 placeholders)")
     p.add_argument("--build-probes-experiment", default=None, choices=["A1", "A2"],
                    help="Build probes for specific experiment only")
+    p.add_argument("--data", default=None,
+                   help="Override MIS input JSON when building probes (A1/A2)")
+    p.add_argument("--output", default=None,
+                   help="Override probe output path when building probes")
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
 
-def build_probes(output_root: Path, experiment: str | None = None) -> None:
+def build_probes(
+    output_root: Path,
+    experiment: str | None = None,
+    data_override: str | None = None,
+    output_override: str | None = None,
+) -> None:
     from harness.data.probe_builder import ProbeBuilder
 
     output_root.mkdir(parents=True, exist_ok=True)
+    data_path = Path(data_override) if data_override else MIS_TEST_ROOT / "mis_easy.json"
 
     if experiment in (None, "A1"):
         print("[probe] Building A1 text-only probes (easy + hard)...")
+        probe_output = Path(output_override) if output_override else output_root / "probe_text_only.json"
         ProbeBuilder.build_text_only_probe(
-            mis_test_json=MIS_TEST_ROOT / "mis_easy.json",
-            output_path=output_root / "probe_text_only.json",
+            mis_test_json=data_path,
+            output_path=probe_output,
         )
-        ProbeBuilder.build_text_only_probe(
-            mis_test_json=MIS_TEST_ROOT / "mis_hard.json",
-            output_path=output_root / "probe_text_only_hard.json",
-        )
-        print(f"  → {output_root}/probe_text_only.json")
-        print(f"  → {output_root}/probe_text_only_hard.json")
+        print(f"  → {probe_output}")
+        if not output_override:
+            ProbeBuilder.build_text_only_probe(
+                mis_test_json=MIS_TEST_ROOT / "mis_hard.json",
+                output_path=output_root / "probe_text_only_hard.json",
+            )
+            print(f"  → {output_root}/probe_text_only_hard.json")
 
     if experiment in (None, "A2"):
         print("[probe] Building A2 relation-type placeholders...")
         ProbeBuilder.annotate_relation_types(
-            mis_hard_json=MIS_TEST_ROOT / "mis_hard.json",
-            output_path=output_root / "mis_hard_relation_annotated.json",
+            mis_hard_json=Path(data_override) if data_override else MIS_TEST_ROOT / "mis_hard.json",
+            output_path=Path(output_override) if output_override else output_root / "mis_hard_relation_annotated.json",
         )
-        print(f"  → {output_root}/mis_hard_relation_annotated.json")
+        print(f"  → {Path(output_override) if output_override else output_root / 'mis_hard_relation_annotated.json'}")
         print("  NOTE: run GPT-4o to fill 'relation_type' fields.")
 
         extra_probe = output_root / "extra_relation_probe.jsonl"
         ProbeBuilder.build_relation_type_probe(
-            mis_hard_json=MIS_TEST_ROOT / "mis_hard.json",
+            mis_hard_json=Path(data_override) if data_override else MIS_TEST_ROOT / "mis_hard.json",
             extra_probe_jsonl=extra_probe if extra_probe.exists() else None,
-            output_path=output_root / "relation_type_probe.json",
+            output_path=Path(output_override) if output_override else output_root / "relation_type_probe.json",
         )
-        print(f"  → {output_root}/relation_type_probe.json")
+        print(f"  → {Path(output_override) if output_override else output_root / 'relation_type_probe.json'}")
 
 
 def _model_overrides(hf_id: str, arch: str | None, size_b: float | None) -> list[str]:
@@ -176,7 +188,7 @@ def main() -> None:
     probes_dir = harness_root / "results" / "prelim" / "probes"
 
     if args.build_probes:
-        build_probes(probes_dir, args.build_probes_experiment)
+        build_probes(probes_dir, args.build_probes_experiment, args.data, args.output)
         return
 
     exps = list(A_EXPERIMENT_CONFIGS.keys()) if args.experiment == "all" else [args.experiment]

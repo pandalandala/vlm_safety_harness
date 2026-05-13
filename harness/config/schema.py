@@ -61,6 +61,15 @@ class DatasetConfig(BaseModel):
     cf_pairs_path: Optional[Path] = None
 
 
+class GeneralDataConfig(BaseModel):
+    sources: list[Path]
+    format: Literal["sharegpt"] = "sharegpt"
+    max_samples: Optional[int] = None
+    ratio: Optional[float] = Field(default=None, gt=0.0, lt=1.0)
+    ratio_mode: Literal["final", "relative_to_primary"] = "final"
+    shuffle_seed: int = 0
+
+
 class TrainingConfig(BaseModel):
     enabled: bool = True
     backend: Literal["llamafactory"] = "llamafactory"
@@ -70,6 +79,7 @@ class TrainingConfig(BaseModel):
     cot_format: Literal["free_text", "structured"] = "structured"
     freeze_vision_tower: bool = True
     freeze_multi_modal_projector: bool = False
+    general_data: Optional[GeneralDataConfig] = None
 
     # Training hyperparams (sensible defaults for 7-8B full fine-tune)
     learning_rate: float = 1e-5

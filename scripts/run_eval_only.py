@@ -14,8 +14,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from harness.evaluation import get_evaluator
 from harness.evaluation.gpt4o_evaluator import GPT4oEvaluator
-from harness.evaluation.metrics import compute_metrics
+from harness.inference.engine import BENCHMARK_REGISTRY
+
+
+def _merge_metrics(existing_metrics: dict, all_metrics: dict[str, dict]) -> dict:
+    merged = existing_metrics or {}
+    if len(all_metrics) == 1:
+        only_metrics = next(iter(all_metrics.values()))
+        merged.update({k: v for k, v in only_metrics.items() if k != "overall"})
+        merged["overall"] = only_metrics.get("overall", {})
+    merged.setdefault("benchmarks", {}).update(
+        {b: m.get("overall", m) for b, m in all_metrics.items()}
+    )
+    return merged
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,9 +54,7 @@ def _resolve_evaluator_type(args, benchmark_name: str) -> str:
     """auto → look up benchmark loader's evaluator_type; else use args.evaluator_type."""
     if args.evaluator_type != "auto":
         return args.evaluator_type
-    # Map benchmark name to loader class via engine registry, then read class attr.
     try:
-        from harness.inference.engine import BENCHMARK_REGISTRY
         spec = BENCHMARK_REGISTRY.get(benchmark_name)
         if spec and not spec.startswith("_"):
             mod_path, cls_name = spec.rsplit(".", 1)
@@ -53,6 +64,20 @@ def _resolve_evaluator_type(args, benchmark_name: str) -> str:
     except Exception:
         pass
     return "gpt4o"
+
+
+def _build_evaluator(args, benchmark_name: str, output_jsonl: Path):
+    ev_type = _resolve_evaluator_type(args, benchmark_name)
+    kwargs = {}
+    if ev_type == "gpt4o":
+        kwargs = {
+            "model": args.judge if args.judge != "gpt-4o" else "gpt-4o",
+            "api_key_env": "OPENAI_API_KEY",
+            "max_concurrent": 20,
+            "compute_per_category": True,
+            "output_jsonl": str(output_jsonl),
+        }
+    return ev_type, get_evaluator(ev_type, **kwargs)
 
 
 def main() -> None:
@@ -84,34 +109,12 @@ def main() -> None:
         evaluator.unload()
 
     else:
-        # GPT-4o, rule, accuracy, harmbench routing via BenchmarkEvaluator
-        from harness.evaluation import get_evaluator
         for jsonl_path in jsonl_files:
             benchmark = jsonl_path.stem
-            ev_type = _resolve_evaluator_type(args, benchmark)
+            out_jsonl = eval_dir / f"{benchmark}.jsonl"
+            ev_type, evaluator = _build_evaluator(args, benchmark, out_jsonl)
             print(f"[eval] {benchmark} (evaluator={ev_type})")
-
-            with open(jsonl_path) as f:
-                records = [json.loads(line) for line in f if line.strip()]
-
-            if ev_type == "gpt4o":
-                # Reuse async-incremental GPT4oEvaluator path for resume support.
-                evaluator = GPT4oEvaluator(
-                    model=args.judge if args.judge != "gpt-4o" else "gpt-4o",
-                    api_key_env="OPENAI_API_KEY",
-                    max_concurrent=20,
-                    compute_per_category=True,
-                )
-                out_jsonl = eval_dir / f"{benchmark}.jsonl"
-                _, metrics = evaluator.evaluate_file(jsonl_path, out_jsonl, resume=args.resume)
-            else:
-                ev = get_evaluator(ev_type)
-                annotated, metrics = ev.evaluate(records)
-                out_jsonl = eval_dir / f"{benchmark}.jsonl"
-                with open(out_jsonl, "w") as f:
-                    for r in annotated:
-                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
-
+            _, metrics = evaluator.evaluate_file(jsonl_path, out_jsonl, resume=args.resume)
             all_metrics[benchmark] = metrics.to_dict()
             print(f"  {metrics.format_table_row()}")
 
@@ -121,11 +124,9 @@ def main() -> None:
     if metrics_path.exists():
         with open(metrics_path) as f:
             existing_metrics = json.load(f)
-    existing_metrics.setdefault("benchmarks", {}).update(
-        {b: m.get("overall", m) for b, m in all_metrics.items()}
-    )
+    merged_metrics = _merge_metrics(existing_metrics, all_metrics)
     with open(metrics_path, "w") as f:
-        json.dump(existing_metrics, f, indent=2)
+        json.dump(merged_metrics, f, indent=2)
 
     print(f"\n[done] Eval results: {eval_dir}")
     print(f"[done] metrics.json: {metrics_path}")

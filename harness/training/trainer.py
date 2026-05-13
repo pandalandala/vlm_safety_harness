@@ -168,6 +168,12 @@ class HarnessTrainer:
     def run_training(self, yaml_path: Path, gpu_plan: TrainPlan) -> None:
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = gpu_plan.cuda_visible_devices()
+        # LlamaFactory uses a src/ layout, so ensure the package is importable
+        # even when the conda env has not been installed editable yet.
+        src_path = str(self.lf_root / "src")
+        env["PYTHONPATH"] = (
+            f"{src_path}:{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
+        )
 
         cmd = [
             "conda", "run", "-n", CONDA_ENV, "--no-capture-output",

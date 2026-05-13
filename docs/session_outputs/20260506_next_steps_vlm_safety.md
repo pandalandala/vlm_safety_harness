@@ -57,14 +57,10 @@ python scripts/run_prelim.py --build-probes
 ### B1. 生成 CoT 标签（关键路径）
 ```bash
 # 若有72B VLM可用：
-python scripts/generate_cot_labels.py \
-    --input data_links/our_dataset/train.json \
-    --backend vllm --model Qwen/Qwen2-VL-72B-Instruct
+python scripts/generate_cot_labels.py --input data_links/our_dataset/train.json --backend vllm --model Qwen/Qwen2-VL-72B-Instruct
 
 # 若无大模型，用GPT-4o：
-python scripts/generate_cot_labels.py \
-    --input data_links/our_dataset/train.json \
-    --backend openai --model gpt-4o
+python scripts/generate_cot_labels.py --input data_links/our_dataset/train.json --backend openai --model gpt-4o
 ```
 - 15,319 samples × ~$0.01/sample (GPT-4o) = ~$150
 - vLLM 72B on 4× A6000: ~8-12h
@@ -86,9 +82,7 @@ python scripts/run_experiment.py main/main_dreams_qwen2vl.yaml
 
 ### C1. 运行消融实验
 ```bash
-for cfg in abl_no_cot abl_synthetic_only abl_no_diverse_relations abl_no_cf_pairs abl_data_scale; do
-    python scripts/run_experiment.py ablation/${cfg}.yaml --skip-train
-done
+for cfg in abl_no_cot abl_synthetic_only abl_no_diverse_relations abl_no_cf_pairs abl_data_scale; do python scripts/run_experiment.py ablation/${cfg}.yaml --skip-train; done
 ```
 
 ### C2. 生成论文表格

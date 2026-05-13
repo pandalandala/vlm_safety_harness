@@ -196,8 +196,7 @@ training:
 
 **Override at runtime**:
 ```bash
-python scripts/run_experiment.py main/main_dreams_internvl.yaml \
-    --override training.learning_rate=5e-6 training.num_train_epochs=5
+python scripts/run_experiment.py main/main_dreams_internvl.yaml --override training.learning_rate=5e-6 training.num_train_epochs=5
 ```
 
 ---

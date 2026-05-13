@@ -19,7 +19,7 @@ The goal is to produce quantitative evidence for the **motivation section (Secti
 
 - Conda env for all inference and eval: `mis_safety`
 - Working directory: `/mnt/hdd/xuran/vlm_safety_harness/`
-- All commands: `conda run -n mis_safety python ...`
+- All commands: `python ...`
 - GPU: up to 8× RTX A6000 48GB; 1 GPU sufficient per ≤9B model
 - Check available GPUs: `nvidia-smi`
 
@@ -98,8 +98,7 @@ A2 (requires hand-crafted relation probe + GPT-4o annotation — most effort)
 
 **Step 1 — Build probes** (black frame replacement):
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --build-probes --experiment A1
+python scripts/run_prelim.py --build-probes --experiment A1
 # Output: results/prelim/probes/probe_text_only.json
 ```
 
@@ -108,9 +107,7 @@ conda run -n mis_safety python scripts/run_prelim.py \
 - Condition B: same samples but both images replaced with 224×224 black PNG
 
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A1 --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 ```
 
 **Step 3 — GPT-4o eval** on both conditions.
@@ -128,8 +125,7 @@ Small ΔASR for MIRage (≈0) → safety from text, not vision.
 
 **Step 1 — Annotate MIS-hard relation types** (GPT-4o):
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --build-probes --experiment A2
+python scripts/run_prelim.py --build-probes --experiment A2
 # GPT-4o labels each MIS-hard sample with relation_type
 # Output: results/prelim/probes/mis_hard_relation_annotated.json
 ```
@@ -157,9 +153,7 @@ conda run -n mis_safety python scripts/run_prelim.py \
 **No probe building needed**. Direct inference on existing MIS splits.
 
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A3 --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 # + MIRage once path known
 ```
 
@@ -178,8 +172,7 @@ Expect: base Gap ≈ 0–5%, MIRage Gap ≈ 15–20%.
 
 **Step 1 — Download MSSBench**:
 ```bash
-huggingface-cli download kzhou35/mssbench --repo-type dataset \
-    --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
+huggingface-cli download kzhou35/mssbench --repo-type dataset --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
 ```
 
 **Step 2 — Load and split** MSSBench into safe/unsafe subsets:

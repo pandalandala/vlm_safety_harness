@@ -4,6 +4,7 @@ Detects available GPUs at runtime and computes optimal training/inference plans.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import argparse
 from dataclasses import dataclass, field
@@ -59,6 +60,25 @@ class InferPlan:
 
 
 class GPUAllocator:
+    @staticmethod
+    def _visible_gpu_ids() -> set[int] | None:
+        """Return CUDA-visible GPU ids if the environment restricts them."""
+        raw = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if raw is None or raw.strip() == "":
+            return None
+
+        ids: set[int] = set()
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                ids.add(int(part))
+            except ValueError:
+                # Non-integer entries (for example UUIDs) are not handled here.
+                return None
+        return ids
+
     def detect(self) -> list[GPUInfo]:
         """Query nvidia-smi for current GPU status."""
         try:
@@ -75,6 +95,7 @@ class GPUAllocator:
         except (subprocess.CalledProcessError, FileNotFoundError):
             return []
 
+        visible_ids = self._visible_gpu_ids()
         gpus = []
         for line in result.stdout.strip().splitlines():
             parts = [p.strip() for p in line.split(",")]
@@ -92,7 +113,9 @@ class GPUAllocator:
                 )
             except (ValueError, IndexError):
                 continue
-        return gpus
+        if visible_ids is None:
+            return gpus
+        return [g for g in gpus if g.index in visible_ids]
 
     def get_available(self) -> list[GPUInfo]:
         return [g for g in self.detect() if g.is_available]

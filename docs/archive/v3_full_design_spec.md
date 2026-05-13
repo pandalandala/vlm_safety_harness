@@ -319,8 +319,8 @@ MIS缺陷详见: .claude/docs/MIS_shortcomes_final.md
   "permissions": {
     "allow": [
       "Bash(nvidia-smi*)",
-      "Bash(conda run -n mis_safety python*)",
-      "Bash(conda run -n mis_safety torchrun*)",
+      "Bash(python*)",
+      "Bash(torchrun*)",
       "Bash(ls /mnt/hdd/xuran*)",
       "Bash(find /mnt/hdd/xuran*)",
       "Bash(cat /mnt/hdd/xuran*)",
@@ -372,9 +372,7 @@ echo ""
 
 # GPU 状态
 echo "[GPU Status]"
-nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu \
-  --format=csv,noheader,nounits | \
-  awk -F',' '{printf "  GPU%s: %s | %sMB/%sMB | util=%s%%\n", $1,$2,$3,$4,$5}'
+nvidia-smi --query-gpu=index,name,memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits | awk -F',' '{printf "  GPU%s: %s | %sMB/%sMB | util=%s%%\n", $1,$2,$3,$4,$5}'
 echo ""
 
 # 数据集状态
@@ -396,9 +394,7 @@ echo ""
 # 最近的实验结果
 echo "[Recent Experiments]"
 if [ -d "$HARNESS_ROOT/results" ]; then
-  find "$HARNESS_ROOT/results" -name "metrics.json" | \
-    xargs -I{} dirname {} | sort -r | head -5 | \
-    while read dir; do
+  find "$HARNESS_ROOT/results" -name "metrics.json" | xargs -I{} dirname {} | sort -r | head -5 | while read dir; do
       exp=$(echo $dir | sed "s|$HARNESS_ROOT/results/||")
       echo "  ✓ $exp"
     done
@@ -426,8 +422,7 @@ echo "" >> "$STATE_FILE"
 
 # 记录最近修改的结果文件
 echo "## Latest Results" >> "$STATE_FILE"
-find "$HARNESS_ROOT/results" -name "metrics.json" -newer "$HARNESS_ROOT/results/SESSION_STATE.md" \
-  2>/dev/null | head -10 | while read f; do
+find "$HARNESS_ROOT/results" -name "metrics.json" -newer "$HARNESS_ROOT/results/SESSION_STATE.md" 2>/dev/null | head -10 | while read f; do
   echo "- $f" >> "$STATE_FILE"
 done
 ```
@@ -578,8 +573,7 @@ class GPUInfo:
     @property
     def is_available(self) -> bool:
         # 使用率 < 20% 且 空闲显存 > 90% 认为可用
-        return self.utilization_pct < 20 and \
-               (self.memory_used_mb / self.memory_total_mb) < 0.1
+        return self.utilization_pct < 20 and (self.memory_used_mb / self.memory_total_mb) < 0.1
 
 @dataclass 
 class TrainPlan:

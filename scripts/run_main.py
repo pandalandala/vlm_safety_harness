@@ -86,7 +86,6 @@ def load_cohort(group_names: list[str]) -> list[str]:
 def run_one(
     config_name: str,
     benchmarks: list[str],
-    slice_fields: list[str],
     args: argparse.Namespace,
 ) -> int:
     """Invoke scripts/run_experiment.py for a single config."""
@@ -96,11 +95,6 @@ def run_one(
         f"main/{config_name}",
         "--benchmarks", *benchmarks,
     ]
-    if slice_fields:
-        # pass via override flag
-        for f in slice_fields:
-            # Handled at metrics computation; flag passed via env var for now
-            pass
     if args.limit:
         cmd += ["--limit", str(args.limit)]
     if args.dry_run:
@@ -149,7 +143,7 @@ def main() -> int:
 
         print(f"\n=== Running {exp_id} (benchmarks={spec['benchmarks']}) ===")
         for cfg_name in cohort_configs:
-            rc = run_one(cfg_name, spec["benchmarks"], spec["slice_fields"], args)
+            rc = run_one(cfg_name, spec["benchmarks"], args)
             if rc != 0:
                 print(f"[fail] {cfg_name} exit={rc}", file=sys.stderr)
                 if not args.dry_run:

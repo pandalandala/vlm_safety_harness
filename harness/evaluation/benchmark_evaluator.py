@@ -8,10 +8,13 @@ Subclass contract:
     metric_name: str          — column header for the E3/E4 result table
     metric_direction: ↑|↓     — for ↑/↓ in table headers
     evaluate(records) → (records_with_labels, MetricsDict)
+    evaluate_file(inference_jsonl, output_jsonl) → same, with file I/O helper
 """
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Literal
 
 from harness.evaluation.metrics import MetricsDict
@@ -35,6 +38,27 @@ class BenchmarkEvaluator(ABC):
             (annotated_records, MetricsDict)
         """
         ...
+
+    def evaluate_file(
+        self,
+        inference_jsonl: Path,
+        output_jsonl: Path,
+        resume: bool = True,
+    ) -> tuple[list[dict], MetricsDict]:
+        records = []
+        with open(inference_jsonl) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+
+        annotated, metrics = self.evaluate(records)
+        output_jsonl = Path(output_jsonl)
+        output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_jsonl, "w") as f:
+            for r in annotated:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        return annotated, metrics
 
 
 def get_evaluator(

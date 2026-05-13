@@ -201,9 +201,7 @@ DREAMS 包含更高比例真实图像，提升真实场景泛化能力。
 
 ### Status: Ready to run (no additional data needed)
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --model OpenGVLab/InternVL3_5-8B
+python scripts/run_prelim.py --experiment A3 --model OpenGVLab/InternVL3_5-8B
 # + Qwen/Qwen3.5-9B + lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 # + re-run with MIRage checkpoint once path known
 ```
@@ -295,13 +293,10 @@ A2 (requires hand-crafted probe JSONL + GPT-4o relation annotation)
 
 **Can run immediately** (base models only):
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py --experiment A3 \
-    --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B \
-             lmms-lab/LLaVA-OneVision-1.5-8B-Instruct deepseek-ai/deepseek-vl2-tiny
+python scripts/run_prelim.py --experiment A3 --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B lmms-lab/LLaVA-OneVision-1.5-8B-Instruct deepseek-ai/deepseek-vl2-tiny
 ```
 
 **Download MSSBench** (unblocks A4):
 ```bash
-huggingface-cli download kzhou35/mssbench --repo-type dataset \
-    --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
+huggingface-cli download kzhou35/mssbench --repo-type dataset --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
 ```

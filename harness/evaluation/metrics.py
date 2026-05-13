@@ -117,6 +117,15 @@ def _slice_by_field(results: list[dict], field_name: str) -> tuple[dict[str, dic
     return per_group, counts
 
 
+def _infer_slice_fields(results: list[dict]) -> list[str]:
+    supported = ["harm_type", "img_source_type"]
+    inferred: list[str] = []
+    for field_name in supported:
+        if any(r.get(field_name) not in (None, "") for r in results):
+            inferred.append(field_name)
+    return inferred
+
+
 def compute_metrics(
     results: list[dict],
     compute_per_category: bool = True,
@@ -130,6 +139,7 @@ def compute_metrics(
         slice_fields: optional list of record fields to slice by, beyond
             `category`. Supported: `harm_type`, `img_source_type`. Adds
             `per_harm_type` / `per_img_source_type` blocks to MetricsDict.
+            If omitted, infer supported slice fields from annotated records.
     """
     overall = _compute_for_group(results)
 
@@ -144,11 +154,11 @@ def compute_metrics(
     per_img_source_type: dict[str, dict[str, float]] = {}
     n_by_img_source_type: dict[str, int] = {}
 
-    if slice_fields:
-        if "harm_type" in slice_fields:
-            per_harm_type, n_by_harm_type = _slice_by_field(results, "harm_type")
-        if "img_source_type" in slice_fields:
-            per_img_source_type, n_by_img_source_type = _slice_by_field(results, "img_source_type")
+    active_slice_fields = slice_fields or _infer_slice_fields(results)
+    if "harm_type" in active_slice_fields:
+        per_harm_type, n_by_harm_type = _slice_by_field(results, "harm_type")
+    if "img_source_type" in active_slice_fields:
+        per_img_source_type, n_by_img_source_type = _slice_by_field(results, "img_source_type")
 
     return MetricsDict(
         overall=overall,

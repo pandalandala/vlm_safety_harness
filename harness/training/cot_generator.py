@@ -117,6 +117,14 @@ class CoTGenerator:
     Backends:
       vllm   — batch inference via local VLM (preferred)
       openai — GPT-4o API (fallback)
+
+    Qwen3.5 thinking mode:
+      The Qwen3.5 chat template defaults to enable_thinking=True, which makes the model
+      emit <think>...</think> reasoning tokens before the answer. For clean annotation
+      output (structured <safety_analysis> format), thinking is disabled via the
+      enable_thinking=False template kwarg — the template instead prepends
+      "<think>\n\n</think>\n\n" to the assistant turn so the model skips the thinking
+      phase entirely and outputs the answer directly.
     """
 
     def __init__(
@@ -130,6 +138,8 @@ class CoTGenerator:
         mode: str = "cot_only",
         openai_api_key: Optional[str] = None,
         output_path: Optional[Path] = None,
+        max_model_len: int = 8192,
+        gpu_memory_utilization: float = 0.88,
     ):
         self.model_path = model_path
         self.backend = backend
@@ -140,8 +150,11 @@ class CoTGenerator:
         self.mode = mode  # "cot_only" | "full_response"
         self.openai_api_key = openai_api_key
         self.output_path = Path(output_path) if output_path else None
+        self.max_model_len = max_model_len
+        self.gpu_memory_utilization = gpu_memory_utilization
 
-        self._llm = None  # lazy init
+        self._llm = None        # lazy init
+        self._processor = None  # lazy init (AutoProcessor for chat template)
 
     def generate_batch(self, records: list[dict]) -> list[dict]:
         """
@@ -201,22 +214,41 @@ class CoTGenerator:
 
     # ── vLLM backend ──────────────────────────────────────────────────────
 
-    def _generate_vllm(self, records: list[dict]) -> list[dict]:
+    def _init_vllm_lazy(self) -> None:
+        """Initialize LLM and processor on first call (lazy, GPU-side)."""
         import os
         if self.gpu_ids:
             os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, self.gpu_ids))
 
-        from vllm import LLM, SamplingParams
+        from vllm import LLM
+        from transformers import AutoProcessor
 
         if self._llm is None:
             self._llm = LLM(
                 model=self.model_path,
                 trust_remote_code=True,
                 tensor_parallel_size=self.tensor_parallel_size,
-                max_model_len=4096,
+                max_model_len=self.max_model_len,
+                max_num_seqs=4,
                 limit_mm_per_prompt={"image": 2},
-                gpu_memory_utilization=0.9,
+                gpu_memory_utilization=self.gpu_memory_utilization,
+                mm_processor_kwargs={
+                    "min_pixels": 200704,   # 448×448 — keeps image token count bounded
+                    "max_pixels": 802816,   # 1008×800 cap for memory safety
+                },
             )
+
+        if self._processor is None:
+            self._processor = AutoProcessor.from_pretrained(
+                self.model_path,
+                min_pixels=200704,
+                max_pixels=802816,
+            )
+
+    def _generate_vllm(self, records: list[dict]) -> list[dict]:
+        from vllm import SamplingParams
+
+        self._init_vllm_lazy()
 
         sampling = SamplingParams(
             temperature=self.temperature,
@@ -234,16 +266,19 @@ class CoTGenerator:
         return results
 
     def _build_vllm_prompt(self, r: dict) -> dict:
-        """Build vLLM multi-modal prompt dict."""
+        """
+        Build a vLLM multimodal prompt for Qwen3.5-VL.
+
+        Uses AutoProcessor.apply_chat_template with enable_thinking=False so the
+        model skips the <think>…</think> reasoning phase and outputs the structured
+        <safety_analysis> block directly, without extra chain-of-thought tokens
+        polluting the annotation label.
+
+        Image format: {"type": "image"} placeholders in the message content, with
+        PIL images passed via multi_modal_data — avoids file:// URL fetching and
+        works with both local and in-memory images.
+        """
         from PIL import Image
-        imgs = []
-        for key in ("image_path1", "image_path2"):
-            p = r.get(key, "")
-            if p:
-                try:
-                    imgs.append(Image.open(p).convert("RGB"))
-                except Exception:
-                    imgs.append(Image.new("RGB", (224, 224)))
 
         system = (
             RESPONSE_GENERATION_SYSTEM
@@ -251,18 +286,48 @@ class CoTGenerator:
             else COT_SYSTEM_PROMPT
         )
 
+        imgs: list = []
+        img_slots: list = []
+        for key in ("image_path1", "image_path2"):
+            p = r.get(key, "")
+            if p:
+                try:
+                    img = Image.open(p).convert("RGB")
+                except Exception:
+                    img = Image.new("RGB", (448, 448), color=(100, 100, 100))
+                imgs.append(img)
+                img_slots.append({"type": "image"})
+
         messages = [
             {"role": "system", "content": system},
             {
                 "role": "user",
                 "content": [
-                    {"type": "image_url", "image_url": {"url": "placeholder1"}},
-                    {"type": "image_url", "image_url": {"url": "placeholder2"}},
+                    *img_slots,
                     {"type": "text", "text": r["question"]},
                 ],
             },
         ]
-        return {"prompt": messages, "multi_modal_data": {"image": imgs}}
+
+        # Apply the chat template on CPU; disable thinking so output is clean annotation.
+        # enable_thinking=False makes the template prepend "<think>\n\n</think>\n\n"
+        # to the assistant turn, signalling the model to answer without extended reasoning.
+        try:
+            text = self._processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            # Older processor versions that don't support enable_thinking
+            text = self._processor.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+
+        return {"prompt": text, "multi_modal_data": {"image": imgs}}
 
     # ── OpenAI fallback ───────────────────────────────────────────────────
 

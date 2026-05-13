@@ -20,11 +20,46 @@ from harness.config.registry import ExperimentRegistry
 from harness.config.schema import ExperimentConfig
 from harness.data.converters import save_llamafactory_dataset
 from harness.data.dataset import HarnessDataset
-from harness.evaluation.gpt4o_evaluator import GPT4oEvaluator
-from harness.evaluation.metrics import MetricsDict
+from harness.evaluation import get_evaluator
 from harness.gpu.allocator import GPUAllocator
-from harness.inference.engine import InferenceEngine
+from harness.inference.engine import BENCHMARK_REGISTRY, InferenceEngine
 from harness.training.trainer import HarnessTrainer
+
+
+def _resolve_evaluator_type(benchmark_name: str) -> str:
+    spec = BENCHMARK_REGISTRY.get(benchmark_name)
+    if spec and not spec.startswith("_"):
+        import importlib
+
+        mod_path, cls_name = spec.rsplit(".", 1)
+        cls = getattr(importlib.import_module(mod_path), cls_name)
+        return getattr(cls, "evaluator_type", "gpt4o")
+    return "gpt4o"
+
+
+def _build_evaluator(cfg: ExperimentConfig, benchmark_name: str, output_jsonl: Path):
+    ev_type = _resolve_evaluator_type(benchmark_name)
+    kwargs = {}
+    if ev_type == "gpt4o":
+        kwargs = {
+            "model": cfg.evaluation.model,
+            "api_key_env": cfg.evaluation.api_key_env,
+            "max_concurrent": cfg.evaluation.max_concurrent_requests,
+            "compute_per_category": cfg.evaluation.compute_per_category,
+            "output_jsonl": str(output_jsonl),
+        }
+    return ev_type, get_evaluator(ev_type, **kwargs)
+
+
+def _merge_metrics(metrics_by_benchmark: dict[str, dict]) -> dict:
+    merged: dict = {"benchmarks": {}}
+    if len(metrics_by_benchmark) == 1:
+        only_metrics = next(iter(metrics_by_benchmark.values()))
+        merged.update({k: v for k, v in only_metrics.items() if k != "overall"})
+        merged["overall"] = only_metrics.get("overall", {})
+    for benchmark, metrics in metrics_by_benchmark.items():
+        merged["benchmarks"][benchmark] = metrics.get("overall", metrics)
+    return merged
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,14 +110,18 @@ def main() -> None:
 
         if args.dry_run:
             print(f"[dry-run] Would train with: {train_plan}")
+            if cfg.training.general_data is not None:
+                print(f"[dry-run] general_data={cfg.training.general_data.model_dump()}")
         else:
             ds = HarnessDataset.from_config(cfg.dataset, mode="train")
             data_file = run_dir / "train_data.json"
             save_llamafactory_dataset(
                 [ds[i] for i in range(len(ds))],
                 data_file,
+                image_root=cfg.dataset.image_root,
                 use_cot=cfg.training.use_cot_labels,
                 cot_format=cfg.training.cot_format,
+                general_data_cfg=cfg.training.general_data,
             )
             trainer = HarnessTrainer()
             model_path = str(trainer.prepare_and_run(cfg, data_file, train_plan, run_dir / "checkpoint"))
@@ -122,24 +161,18 @@ def main() -> None:
     all_metrics: dict[str, dict] = {}
 
     if not args.skip_eval and not args.dry_run:
-        evaluator = GPT4oEvaluator(
-            model=cfg.evaluation.model,
-            api_key_env=cfg.evaluation.api_key_env,
-            max_concurrent=cfg.evaluation.max_concurrent_requests,
-            compute_per_category=cfg.evaluation.compute_per_category,
-        )
-
         eval_dir = run_dir / "eval_results"
         for jsonl_path in sorted(responses_dir.glob("*.jsonl")):
             benchmark = jsonl_path.stem
             out_jsonl = eval_dir / f"{benchmark}.jsonl"
-            print(f"[eval] {benchmark}")
+            ev_type, evaluator = _build_evaluator(cfg, benchmark, out_jsonl)
+            print(f"[eval] {benchmark} (evaluator={ev_type})")
             _, metrics = evaluator.evaluate_file(jsonl_path, out_jsonl, resume=args.resume)
             all_metrics[benchmark] = metrics.to_dict()
             print(f"  → {metrics.format_table_row()}")
 
     # ── Save metrics ──────────────────────────────────────────────────────
-    metrics_out = {"benchmarks": {b: m.get("overall", m) for b, m in all_metrics.items()}}
+    metrics_out = _merge_metrics(all_metrics)
     with open(run_dir / "metrics.json", "w") as f:
         json.dump(metrics_out, f, indent=2)
 

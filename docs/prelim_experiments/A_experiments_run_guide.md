@@ -36,7 +36,7 @@ echo $OPENAI_API_KEY
 nvidia-smi --query-gpu=index,memory.free,memory.total --format=csv,noheader
 
 # Env 可用
-conda run -n mis_safety python -c "import vllm; print(vllm.__version__)"
+python -c "import vllm; print(vllm.__version__)"
 ```
 
 ---
@@ -59,7 +59,7 @@ Step 4: A2（需手工 probe JSONL，工作量最大）
 
 ```bash
 cd /mnt/hdd/xuran/vlm_safety_harness
-conda run -n mis_safety python scripts/run_prelim.py --build-probes
+python scripts/run_prelim.py --build-probes
 ```
 
 输出：
@@ -76,26 +76,16 @@ conda run -n mis_safety python scripts/run_prelim.py --build-probes
 cd /mnt/hdd/xuran/vlm_safety_harness
 
 # --- Base VLMs ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models OpenGVLab/InternVL3_5-8B
+python scripts/run_prelim.py --experiment A3 --models OpenGVLab/InternVL3_5-8B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models Qwen/Qwen3.5-9B
+python scripts/run_prelim.py --experiment A3 --models Qwen/Qwen3.5-9B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A3 --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 
 # --- MIRage ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models Tuwhy/InternVL2.5-8B-MIRage
+python scripts/run_prelim.py --experiment A3 --models Tuwhy/InternVL2.5-8B-MIRage
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A3 \
-    --models Tuwhy/Qwen2-VL-7B-MIRage
+python scripts/run_prelim.py --experiment A3 --models Tuwhy/Qwen2-VL-7B-MIRage
 ```
 
 **每次跑 3 个 benchmark**：`mis_easy` / `mis_hard` / `mis_real`  
@@ -109,9 +99,7 @@ conda run -n mis_safety python scripts/run_prelim.py \
 ### 2a. 下载 MSSBench
 
 ```bash
-conda run -n mis_safety huggingface-cli download kzhou35/mssbench \
-    --repo-type dataset \
-    --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
+huggingface-cli download kzhou35/mssbench --repo-type dataset --local-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/mssbench
 ```
 
 ### 2b. 确认 test_path（如文件名不是 `mssbench.json`）
@@ -132,26 +120,16 @@ dataset:
 cd /mnt/hdd/xuran/vlm_safety_harness
 
 # --- Base VLMs ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A4 \
-    --models OpenGVLab/InternVL3_5-8B
+python scripts/run_prelim.py --experiment A4 --models OpenGVLab/InternVL3_5-8B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A4 \
-    --models Qwen/Qwen3.5-9B
+python scripts/run_prelim.py --experiment A4 --models Qwen/Qwen3.5-9B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A4 \
-    --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A4 --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 
 # --- MIRage ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A4 \
-    --models Tuwhy/InternVL2.5-8B-MIRage
+python scripts/run_prelim.py --experiment A4 --models Tuwhy/InternVL2.5-8B-MIRage
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A4 \
-    --models Tuwhy/Qwen2-VL-7B-MIRage
+python scripts/run_prelim.py --experiment A4 --models Tuwhy/Qwen2-VL-7B-MIRage
 ```
 
 **每次跑 3 个 benchmark**：`mssbench_safe` / `mssbench_unsafe` / `mis_hard`  
@@ -166,26 +144,16 @@ conda run -n mis_safety python scripts/run_prelim.py \
 cd /mnt/hdd/xuran/vlm_safety_harness
 
 # --- Base VLMs ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models OpenGVLab/InternVL3_5-8B
+python scripts/run_prelim.py --experiment A1 --models OpenGVLab/InternVL3_5-8B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models Qwen/Qwen3.5-9B
+python scripts/run_prelim.py --experiment A1 --models Qwen/Qwen3.5-9B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A1 --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 
 # --- MIRage ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models Tuwhy/InternVL2.5-8B-MIRage
+python scripts/run_prelim.py --experiment A1 --models Tuwhy/InternVL2.5-8B-MIRage
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A1 \
-    --models Tuwhy/Qwen2-VL-7B-MIRage
+python scripts/run_prelim.py --experiment A1 --models Tuwhy/Qwen2-VL-7B-MIRage
 ```
 
 **每次跑 4 个 benchmark**：`mis_easy` / `mis_hard` / `probe_text_only` / `probe_text_only_hard`  
@@ -217,8 +185,7 @@ conda run -n mis_safety python scripts/run_prelim.py \
 ### 4c. 重新生成合并 probe（包含手工样本）
 
 ```bash
-conda run -n mis_safety python scripts/run_prelim.py \
-    --build-probes --build-probes-experiment A2
+python scripts/run_prelim.py --build-probes --build-probes-experiment A2
 ```
 
 ### 4d. 运行 A2
@@ -227,26 +194,16 @@ conda run -n mis_safety python scripts/run_prelim.py \
 cd /mnt/hdd/xuran/vlm_safety_harness
 
 # --- Base VLMs ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A2 \
-    --models OpenGVLab/InternVL3_5-8B
+python scripts/run_prelim.py --experiment A2 --models OpenGVLab/InternVL3_5-8B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A2 \
-    --models Qwen/Qwen3.5-9B
+python scripts/run_prelim.py --experiment A2 --models Qwen/Qwen3.5-9B
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A2 \
-    --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+python scripts/run_prelim.py --experiment A2 --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
 
 # --- MIRage ---
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A2 \
-    --models Tuwhy/InternVL2.5-8B-MIRage
+python scripts/run_prelim.py --experiment A2 --models Tuwhy/InternVL2.5-8B-MIRage
 
-conda run -n mis_safety python scripts/run_prelim.py \
-    --experiment A2 \
-    --models Tuwhy/Qwen2-VL-7B-MIRage
+python scripts/run_prelim.py --experiment A2 --models Tuwhy/Qwen2-VL-7B-MIRage
 ```
 
 ---

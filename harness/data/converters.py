@@ -8,8 +8,13 @@ Format converters between DREAMS/MIS formats and downstream consumers.
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 from typing import Optional
+
+from datasets import load_dataset
+
+from harness.config.schema import GeneralDataConfig
 
 
 # ── LLaMA-Factory ──────────────────────────────────────────────────────────
@@ -72,6 +77,139 @@ def to_llamafactory_format(
     return out
 
 
+def build_mixed_llamafactory_dataset(
+    primary_records: list[dict],
+    general_data_cfg: Optional[GeneralDataConfig],
+    image_root: Optional[Path] = None,
+    use_cot: bool = True,
+    cot_format: str = "structured",
+) -> list[dict]:
+    primary = to_llamafactory_format(primary_records, image_root, use_cot, cot_format)
+    if general_data_cfg is None:
+        return primary
+
+    general = load_general_sharegpt_records(general_data_cfg)
+    return primary + general
+
+
+def load_general_sharegpt_records(cfg: GeneralDataConfig) -> list[dict]:
+    if cfg.format != "sharegpt":
+        raise ValueError(f"Unsupported general_data format: {cfg.format}")
+
+    all_records: list[dict] = []
+    for source in cfg.sources:
+        all_records.extend(_load_sharegpt_records_from_source(Path(source)))
+
+    if not all_records:
+        raise ValueError("No general-data samples loaded from configured sources.")
+
+    rng = random.Random(cfg.shuffle_seed)
+    rng.shuffle(all_records)
+    return all_records
+
+
+def resolve_general_sample_count(primary_count: int, cfg: GeneralDataConfig) -> int:
+    if cfg.max_samples is not None:
+        return cfg.max_samples
+    if cfg.ratio is None:
+        raise ValueError("general_data requires either max_samples or ratio.")
+
+    if cfg.ratio_mode == "final":
+        sample_count = int(round(primary_count * cfg.ratio / (1.0 - cfg.ratio)))
+    else:
+        sample_count = int(round(primary_count * cfg.ratio))
+    return max(sample_count, 1)
+
+
+def _load_sharegpt_records_from_source(source: Path) -> list[dict]:
+    if source.is_file():
+        return _load_sharegpt_records_from_file(source)
+
+    if not source.exists():
+        raise FileNotFoundError(
+            f"Configured general_data source does not exist: {source}"
+        )
+
+    candidate_files = sorted(
+        [p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in {".json", ".jsonl", ".parquet"}]
+    )
+    if not candidate_files:
+        raise FileNotFoundError(
+            f"No JSON/JSONL/Parquet files found under general_data source: {source}"
+        )
+
+    loaded: list[dict] = []
+    for path in candidate_files:
+        loaded.extend(_load_sharegpt_records_from_file(path))
+    return loaded
+
+
+def _load_sharegpt_records_from_file(path: Path) -> list[dict]:
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        with open(path) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            if "data" in data and isinstance(data["data"], list):
+                data = data["data"]
+            else:
+                data = [data]
+        return [_normalize_sharegpt_record(record, path) for record in data if _looks_like_sharegpt_record(record)]
+
+    if suffix == ".jsonl":
+        records = []
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                if _looks_like_sharegpt_record(record):
+                    records.append(_normalize_sharegpt_record(record, path))
+        return records
+
+    if suffix == ".parquet":
+        dataset = load_dataset("parquet", data_files=str(path), split="train")
+        records = []
+        for record in dataset:
+            record = dict(record)
+            if _looks_like_sharegpt_record(record):
+                records.append(_normalize_sharegpt_record(record, path))
+        return records
+
+    return []
+
+
+def _looks_like_sharegpt_record(record: dict) -> bool:
+    return isinstance(record, dict) and isinstance(record.get("conversations"), list)
+
+
+def _normalize_sharegpt_record(record: dict, source_path: Path) -> dict:
+    normalized = {
+        "conversations": record["conversations"],
+        "images": _normalize_images(record.get("images") or record.get("image") or []),
+    }
+    if "id" in record:
+        normalized["id"] = record["id"]
+    else:
+        normalized["id"] = f"general::{source_path.name}::{len(normalized['images'])}::{hash(str(record.get('conversations')))}"
+    if "category" in record:
+        normalized["category"] = record["category"]
+    if "sub_category" in record:
+        normalized["sub_category"] = record["sub_category"]
+    return normalized
+
+
+def _normalize_images(images: object) -> list[str]:
+    if images is None:
+        return []
+    if isinstance(images, str):
+        return [images]
+    if isinstance(images, list):
+        return [str(x) for x in images if x]
+    return []
+
+
 def _format_cot(raw_cot: str, fmt: str) -> str:
     if fmt == "structured":
         return (
@@ -88,9 +226,29 @@ def save_llamafactory_dataset(
     image_root: Optional[Path] = None,
     use_cot: bool = True,
     cot_format: str = "structured",
+    general_data_cfg: Optional[GeneralDataConfig] = None,
 ) -> Path:
     """Convert and write to JSON file for LLaMA-Factory."""
-    lf_records = to_llamafactory_format(records, image_root, use_cot, cot_format)
+    lf_records = build_mixed_llamafactory_dataset(
+        records,
+        general_data_cfg=general_data_cfg,
+        image_root=image_root,
+        use_cot=use_cot,
+        cot_format=cot_format,
+    )
+
+    if general_data_cfg is not None:
+        primary_count = len(to_llamafactory_format(records, image_root, use_cot, cot_format))
+        target_general = resolve_general_sample_count(primary_count, general_data_cfg)
+        base_general = lf_records[primary_count:]
+        if not base_general:
+            raise ValueError("General-data mix requested but zero general records were loaded.")
+        if len(base_general) < target_general:
+            raise ValueError(
+                f"Requested {target_general} general samples, but only {len(base_general)} are available from configured sources."
+            )
+        lf_records = lf_records[:primary_count] + base_general[:target_general]
+
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:

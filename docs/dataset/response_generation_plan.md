@@ -322,12 +322,7 @@ git commit -m "feat: add full_response mode to CoTGenerator with DREAMS-optimize
 Generate CoT + safety responses for DREAMS training data using Qwen3.5-122B-A10B.
 
 Usage:
-    python scripts/generate_responses.py \
-        --dataset /mnt/hdd/xuran/mis_dataset_builder/dataset \
-        --model Qwen/Qwen3.5-122B-A10B \
-        --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json \
-        --batch-size 4 \
-        --resume
+    python scripts/generate_responses.py --dataset /mnt/hdd/xuran/mis_dataset_builder/dataset --model Qwen/Qwen3.5-122B-A10B --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json --batch-size 4 --resume
 """
 import argparse
 import json
@@ -470,10 +465,7 @@ git commit -m "feat: add generate_responses.py for DREAMS training data annotati
 
 ```bash
 cd /mnt/hdd/xuran/vlm_safety_harness
-conda run -n mis_safety python scripts/generate_responses.py \
-    --model Qwen/Qwen2.5-VL-7B-Instruct \
-    --limit 5 \
-    --output /tmp/test_responses.json
+python scripts/generate_responses.py --model Qwen/Qwen2.5-VL-7B-Instruct --limit 5 --output /tmp/test_responses.json
 ```
 
 Expected: 5 records with non-empty `conversations[1]["value"]` containing `<safety_analysis>` tags.
@@ -496,12 +488,7 @@ for r in d[:3]:
 
 ```bash
 cd /mnt/hdd/xuran/vlm_safety_harness
-conda run -n mis_safety python scripts/generate_responses.py \
-    --model Qwen/Qwen3.5-122B-A10B \
-    --batch-size 4 \
-    --max-tokens 768 \
-    --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json \
-    --resume
+python scripts/generate_responses.py --model Qwen/Qwen3.5-122B-A10B --batch-size 4 --max-tokens 768 --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json --resume
 ```
 
 Expected runtime: ~6–10 hours on 8× A6000.

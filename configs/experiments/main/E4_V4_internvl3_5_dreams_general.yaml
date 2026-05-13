@@ -1,13 +1,18 @@
-# E4 V4: InternVL3.5-8B + DREAMS + general-data SFT.
-#
-# DISABLED until user supplies general-data mix (same as V2).
+# E4 V4: InternVL3.5-8B + DREAMS + M4-Instruct at 11% final-data ratio.
 
 name: E4_V4_internvl3_5_dreams_general
-description: "E4 V4 — InternVL3.5-8B + DREAMS + general-data SFT (BLOCKED on user mix)"
-tags: [main, e4, v4, capability, tier_a, blocked]
+description: "E4 V4 — InternVL3.5-8B + DREAMS + M4-Instruct general data at 11% final ratio"
+tags: [main, e4, v4, capability, tier_a, general_data]
 group: main
 
 _extends: experiments/main/E4_V3_internvl3_5_dreams.yaml
 
 training:
-  enabled: false   # ← blocked until general-data mix decided.
+  enabled: true
+  general_data:
+    sources:
+      - /mnt/hdd/xuran/mis_dataset_builder/general_data/m4_instruct
+    ratio: 0.11
+    ratio_mode: final
+    format: sharegpt
+    shuffle_seed: 0

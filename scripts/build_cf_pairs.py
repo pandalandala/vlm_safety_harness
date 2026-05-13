@@ -35,7 +35,11 @@ from pathlib import Path
 # Allow running from anywhere
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from harness.data.cf_synthesizer import CFSynthesizer, collect_benign_pool
+from harness.data.cf_synthesizer import (
+    CFSynthesizer,
+    SemanticBenignRetriever,
+    collect_benign_pool,
+)
 
 
 def build_argparser() -> argparse.ArgumentParser:
@@ -53,10 +57,27 @@ def build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--swap-idx", type=int, choices=[1, 2], default=2,
                    help="Which image (1 or 2) to replace with benign.")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--dataset-root", type=Path, default=None,
+                   help="Dataset root for resolving relative image paths in test.json. "
+                        "Defaults to parent of --test-json.")
     p.add_argument("--limit", type=int, default=None,
                    help="Limit input records (for smoke testing).")
+    p.add_argument("--benign-pool-limit", type=int, default=None,
+                   help="Limit benign pool size (debugging / smoke testing).")
     p.add_argument("--filter-harm-type", choices=["explicit", "implicit"], default=None,
                    help="Only process records with this harm_type.")
+    p.add_argument("--retrieval-method", choices=["random", "semantic"], default="random",
+                   help="How to select the benign replacement image.")
+    p.add_argument("--semantic-model", default="google/siglip2-so400m-patch14-384",
+                   help="HF model used for image-image semantic retrieval.")
+    p.add_argument("--semantic-cache", type=Path, default=None,
+                   help="Optional cache path for benign pool embeddings.")
+    p.add_argument("--semantic-device", default=None,
+                   help="Device for semantic retrieval model, e.g. cuda or cpu.")
+    p.add_argument("--semantic-batch-size", type=int, default=32,
+                   help="Batch size for semantic embedding extraction.")
+    p.add_argument("--semantic-top-k", type=int, default=1,
+                   help="Retrieve top-k semantically similar benign candidates and sample one.")
     p.add_argument("--quality-judge", choices=["gpt-4o-mini", "gpt-4o"], default=None,
                    help="If set, verify pair safety with LLM judge (not yet wired).")
     p.add_argument("--max-retries", type=int, default=3,
@@ -102,7 +123,34 @@ def main() -> int:
 
     print(f"[load] benign pool from {args.benign_pool}")
     pool = collect_benign_pool(args.benign_pool)
+    if args.benign_pool_limit:
+        pool = pool[:args.benign_pool_limit]
     print(f"  pool size: {len(pool)} images")
+
+    dataset_root = args.dataset_root or args.test_json.parent
+    print(f"[config] dataset_root={dataset_root}")
+    print(f"[config] retrieval_method={args.retrieval_method}")
+
+    semantic_retriever = None
+    if args.retrieval_method == "semantic":
+        cache_path = args.semantic_cache
+        if cache_path is None:
+            safe_model_name = args.semantic_model.replace("/", "--")
+            cache_path = args.output.parent / f".semantic_cache_{safe_model_name}.pt"
+        print(
+            f"[semantic] model={args.semantic_model} device={args.semantic_device or 'auto'} "
+            f"batch_size={args.semantic_batch_size} top_k={args.semantic_top_k}"
+        )
+        print(f"[semantic] cache={cache_path}")
+        semantic_retriever = SemanticBenignRetriever(
+            benign_pool=pool,
+            model_name=args.semantic_model,
+            cache_path=cache_path,
+            device=args.semantic_device,
+            batch_size=args.semantic_batch_size,
+            seed=args.seed,
+            local_files_only=True,
+        )
 
     synth = CFSynthesizer(
         benign_pool=pool,
@@ -111,7 +159,14 @@ def main() -> int:
     )
 
     print(f"[synth] generating CF pairs (swap_idx={args.swap_idx})")
-    cf_records = synth.synthesize(records, cf_image_dir=args.cf_images_dir)
+    cf_records = synth.synthesize(
+        records,
+        cf_image_dir=args.cf_images_dir,
+        dataset_root=dataset_root,
+        retrieval_method=args.retrieval_method,
+        semantic_retriever=semantic_retriever,
+        semantic_top_k=args.semantic_top_k,
+    )
 
     if args.quality_judge:
         print(f"[judge] {args.quality_judge} pair-safety verification "
