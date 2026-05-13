@@ -108,7 +108,7 @@ class HarnessTrainer:
             raise ValueError(f"Unknown architecture: {mc.architecture}")
 
         lf_params = gpu_plan.to_llamafactory_params()
-        deepspeed_cfg = self.lf_root / "examples" / "deepspeed" / lf_params["deepspeed"]
+        deepspeed_cfg = self.lf_root / lf_params["deepspeed"]
 
         data = {
             # model

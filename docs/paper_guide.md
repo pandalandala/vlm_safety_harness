@@ -989,7 +989,7 @@ CUDA_VISIBLE_DEVICES=4,5 python scripts/run_experiment.py main/main_dreams_llava
 # MIRage-data SFT × 3 架构（与 DREAMS SFT 并行，若 GPU 充足）
 CUDA_VISIBLE_DEVICES=6,7 python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml
 CUDA_VISIBLE_DEVICES=0,1 python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml
-CUDA_VISIBLE_DEVICES=0,1 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml
+CUDA_VISIBLE_DEVICES=2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml
 ```
 
 **Wave 2 — SFT checkpoint 同步到 78server 后（可并行）**
