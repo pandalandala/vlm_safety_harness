@@ -116,7 +116,7 @@ def main() -> None:
             ds = HarnessDataset.from_config(cfg.dataset, mode="train")
             data_file = run_dir / "train_data.json"
             save_llamafactory_dataset(
-                [ds[i] for i in range(len(ds))],
+                ds.to_train_records(),
                 data_file,
                 image_root=cfg.dataset.image_root,
                 use_cot=cfg.training.use_cot_labels,

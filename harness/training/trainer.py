@@ -152,8 +152,6 @@ class HarnessTrainer:
         # Architecture-specific overrides
         if mc.architecture in ("qwen2vl", "qwen3_vl"):
             data["image_max_pixels"] = mc.max_pixels or 262144
-        if mc.architecture == "internvl" and mc.max_dynamic_patch:
-            data["max_dynamic_patch"] = mc.max_dynamic_patch
 
         # Remove None values
         data = {k: v for k, v in data.items() if v is not None}
@@ -174,6 +172,7 @@ class HarnessTrainer:
         env["PYTHONPATH"] = (
             f"{src_path}:{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
         )
+        env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
         cmd = [
             "conda", "run", "-n", CONDA_ENV, "--no-capture-output",

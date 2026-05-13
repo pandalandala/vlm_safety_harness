@@ -1,5 +1,5 @@
 name: internvl3_5_8b
-hf_path: OpenGVLab/InternVL3_5-8B
+hf_path: OpenGVLab/InternVL3_5-8B-HF
 architecture: internvl
 size_b: 8.0
 trust_remote_code: true

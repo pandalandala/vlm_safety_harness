@@ -223,6 +223,36 @@ class HarnessDataset:
             })
         return records
 
+    def to_train_records(self) -> list[dict]:
+        """Return lightweight records for LLaMA-Factory training export.
+
+        This avoids eagerly opening every image file. Training export only
+        needs text, image paths, and metadata.
+        """
+        records = []
+        for r in self._records:
+            question = self._extract_question(r)
+            image_paths = self._resolve_image_paths(r)
+            cot_response = ""
+            if self.mode == "train" and len(r.get("conversations", [])) > 1:
+                cot_response = r["conversations"][1].get("value", "")
+
+            records.append({
+                "id": r.get("id"),
+                "question": question,
+                "image_path1": str(image_paths[0]) if image_paths else "",
+                "image_path2": str(image_paths[1]) if len(image_paths) > 1 else "",
+                "category": r.get("category", ""),
+                "sub_category": r.get("sub_category", ""),
+                "img_source": r.get("img_source", ""),
+                "img1_source": r.get("img1_source", ""),
+                "img2_source": r.get("img2_source", ""),
+                "harm_type": r.get("harm_type", ""),
+                "path_name": r.get("path_name", ""),
+                "cot_response": cot_response,
+            })
+        return records
+
     def _extract_question(self, r: dict) -> str:
         convs = r.get("conversations", [])
         if convs:

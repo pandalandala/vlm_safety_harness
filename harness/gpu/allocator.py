@@ -148,12 +148,13 @@ class GPUAllocator:
         elif model_size_b <= 9:
             # 7–8B: 2–4 GPUs, ZeRO-3
             use_n = min(n, 4)
+            deepspeed_config = "ds_z3_offload_config" if use_n <= 2 else "ds_z3_config"
             return TrainPlan(
                 gpu_ids=gpu_ids[:use_n],
                 num_gpus=use_n,
                 per_device_batch=1,
                 grad_accum=max(1, 4),
-                deepspeed_config="ds_z3_config",
+                deepspeed_config=deepspeed_config,
                 effective_batch=use_n * 1 * 4,
             )
         elif model_size_b <= 30:

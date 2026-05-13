@@ -1,0 +1,75 @@
+dataset:
+  categories: null
+  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+  filter_harm_type: null
+  filter_img_source: null
+  filter_img_source_type: null
+  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
+  max_test_samples: null
+  max_train_samples: null
+  name: dreams_main_internvl3_5
+  test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
+  text_only_mode: false
+  train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json
+description: InternVL3.5-8B fine-tuned on DREAMS dataset with structured CoT
+evaluation:
+  api_key_env: OPENAI_API_KEY
+  compute_per_category: true
+  max_concurrent_requests: 20
+  max_tokens: 128
+  model: gpt-4o
+  output_format:
+  - json
+  - latex
+  temperature: 0.0
+group: main
+inference:
+  backend: lf_vllm
+  batch_size: 32
+  benchmarks:
+  - our_test
+  concurrency: 16
+  max_tokens: 1024
+  temperature: 0.0
+model:
+  architecture: internvl
+  hf_path: OpenGVLab/InternVL3_5-8B-HF
+  max_dynamic_patch: 4
+  max_model_len: 8192
+  max_pixels: null
+  min_pixels: null
+  name: internvl3_5_8b
+  size_b: 8.0
+  trust_remote_code: true
+name: main_dreams_internvl3_5
+tags:
+- main
+- internvl3_5
+- dreams
+- full-sft
+- tier_a
+tracking:
+  backend: none
+  entity: null
+  project: dreams_vlm_safety
+  run_name: null
+training:
+  backend: llamafactory
+  bf16: true
+  cot_format: structured
+  cutoff_len: 2048
+  enabled: true
+  finetuning_type: full
+  freeze_multi_modal_projector: false
+  freeze_vision_tower: true
+  general_data: null
+  learning_rate: 1.0e-05
+  logging_steps: 10
+  lr_scheduler_type: cosine
+  max_gpus: 8
+  num_train_epochs: 3.0
+  output_dir: null
+  resume_from_checkpoint: null
+  save_steps: 500
+  use_cot_labels: true
+  warmup_ratio: 0.1
