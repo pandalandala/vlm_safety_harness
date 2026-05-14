@@ -12,7 +12,7 @@ model:
   hf_path: Qwen/Qwen3.5-9B
   architecture: qwen3_vl
   size_b: 9.0
-  trust_remote_code: false
+  trust_remote_code: true
   max_model_len: 8192
   min_pixels: 200704
   max_pixels: 1003520
@@ -38,7 +38,8 @@ training:
   lr_scheduler_type: cosine
   warmup_ratio: 0.1
   bf16: true
-  cutoff_len: 2048
+  cutoff_len: 4096
+  save_strategy: "no"
   save_steps: 500
   logging_steps: 10
 

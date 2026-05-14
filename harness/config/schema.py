@@ -88,7 +88,10 @@ class TrainingConfig(BaseModel):
     warmup_ratio: float = 0.1
     bf16: bool = True
     cutoff_len: int = 2048
+    save_strategy: Optional[Literal["steps", "epoch", "no"]] = None
     save_steps: int = 500
+    save_total_limit: Optional[int] = None
+    save_only_model: bool = False
     logging_steps: int = 10
 
     output_dir: Optional[Path] = None           # Auto-generated if None

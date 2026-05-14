@@ -332,27 +332,27 @@ python scripts/run_prelim.py --experiment A4 --models Tuwhy/InternVL2.5-8B-MIRag
 **DREAMS SFT（按架构逐条运行）**:
 
 ```bash
-# InternVL3.5-8B + DREAMS SFT（训练 + 推理 + 评测）
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml
+# InternVL3.5-8B + DREAMS SFT（训练 + 推理；GPT 评测由 78server 单独跑）
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval
 
 # Qwen3.5-9B + DREAMS SFT
-python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml
+python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml --skip-eval
 
 # LLaVA-OV-1.5-8B + DREAMS SFT
-python scripts/run_experiment.py main/main_dreams_llava_ov.yaml
+python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval
 ```
 
 **MIRage-data SFT（按架构逐条运行，用于 E2/E3 对比；E5 暂停不纳入当前对比）**:
 
 ```bash
 # InternVL3.5-8B + MIRage-data SFT
-python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml
+python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml --skip-eval
 
 # Qwen3.5-9B + MIRage-data SFT
-python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml
+python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml --skip-eval
 
 # LLaVA-OV-1.5-8B + MIRage-data SFT
-python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml
+python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval
 ```
 
 #### 6.1.2 Tier A Base 推理命令（跳过训练）
@@ -711,13 +711,13 @@ python scripts/run_capability.py --variants V1 --baseline internvl3_5 --benchmar
 
 ```bash
 # 25% 数据
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override dataset.max_train_samples=3750
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --override dataset.max_train_samples=3750
 
 # 50% 数据
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override dataset.max_train_samples=7500
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --override dataset.max_train_samples=7500
 
 # 75% 数据
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override dataset.max_train_samples=11250
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --override dataset.max_train_samples=11250
 
 # 100% 数据（与 E1 共用 checkpoint）
 # 无需重复运行
@@ -727,10 +727,10 @@ python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override da
 
 ```bash
 # 仅合成图（filter_img_source_type=synth）
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override dataset.filter_img_source_type=synth
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --override dataset.filter_img_source_type=synth
 
 # 仅真实图（filter_img_source_type=real）
-python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --override dataset.filter_img_source_type=real
+python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --override dataset.filter_img_source_type=real
 
 # 50/50 混合（默认，无需额外运行）
 ```
@@ -982,14 +982,16 @@ huggingface-cli download lmms-lab/M4-Instruct \
 
 ```bash
 # DREAMS SFT × 3 架构（可并行，或逐一排队）
-CUDA_VISIBLE_DEVICES=0,1 python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml
-CUDA_VISIBLE_DEVICES=2,3 python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml
-CUDA_VISIBLE_DEVICES=4,5 python scripts/run_experiment.py main/main_dreams_llava_ov.yaml
+# --skip-eval: 训练机只做训练+推理，GPT 评测交给 78server；
+#              同时让 registry 不把此 run 标记为 completed，确保 78server --skip-train 能正常执行。
+🏃‍♂️ （中断，还剩1300steps,6h）CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval
+🏃‍♂️ (到14点) CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml --skip-eval
+（12h）CUDA_VISIBLE_DEVICES=4,5,6,7 python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval
 
 # MIRage-data SFT × 3 架构（与 DREAMS SFT 并行，若 GPU 充足）
-CUDA_VISIBLE_DEVICES=6,7 python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml
-CUDA_VISIBLE_DEVICES=0,1 python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml
-CUDA_VISIBLE_DEVICES=2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml
+✅ CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml --skip-eval
+（3h）CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml --skip-eval
+（3h）CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval
 ```
 
 **Wave 2 — SFT checkpoint 同步到 78server 后（可并行）**

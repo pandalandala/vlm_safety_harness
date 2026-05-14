@@ -10,9 +10,9 @@ _extends: base/model_llava_ov_1_5_8b.yaml
 model:
   name: llava_ov_1_5_8b
   hf_path: lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
-  architecture: llava
+  architecture: llava_ov_1_5
   size_b: 8.0
-  trust_remote_code: false
+  trust_remote_code: true
   max_model_len: 4096
 
 dataset:
@@ -37,6 +37,7 @@ training:
   warmup_ratio: 0.1
   bf16: true
   cutoff_len: 2048
+  save_strategy: "no"
   save_steps: 500
   logging_steps: 10
 

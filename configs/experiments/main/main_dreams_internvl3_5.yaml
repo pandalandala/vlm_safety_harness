@@ -41,6 +41,7 @@ training:
   warmup_ratio: 0.1
   bf16: true
   cutoff_len: 2048
+  save_strategy: "no"
   save_steps: 500
   logging_steps: 10
 

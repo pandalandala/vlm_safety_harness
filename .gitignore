@@ -13,3 +13,36 @@ results/SESSION_STATE.md
 models/
 *.log
 .DS_Store
+results/main/**
+
+# Training / evaluation artifacts
+checkpoint/
+checkpoints/
+**/checkpoint/
+**/checkpoints/
+**/checkpoint-*/
+**/runs/
+**/wandb/
+**/tensorboard/
+**/lightning_logs/
+**/artifacts/
+**/outputs/
+
+# Large model / optimizer files
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+*.mlmodel
+
+# Scratch / cache directories that can grow quickly
+cache/
+**/cache/
+.cache/
+hf_cache/
+**/hf_cache/
+tmp/
+**/tmp/

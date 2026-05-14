@@ -11,7 +11,7 @@ training:
   enabled: true
   general_data:
     sources:
-      - /mnt/hdd/xuran/mis_dataset_builder/general_data/m4_instruct
+      - /mnt2/xuran_hdd/.cache/huggingface/hub/datasets--lmms-lab--M4-Instruct-Data/snapshots/9078d03bb7442cef5a71771a29a2af9ec0f63134
     max_samples: 500
     format: sharegpt
     shuffle_seed: 0

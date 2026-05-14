@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -23,6 +25,7 @@ from harness.gpu.allocator import TrainPlan
 
 LLAMAFACTORY_ROOT = Path("/mnt/hdd/xuran/LlamaFactory")
 CONDA_ENV = "mis_safety"
+CONDA_BIN = Path("/mnt/hdd/xuran/anaconda3/bin/conda")
 
 # Maps our architecture IDs to LLaMA-Factory template names.
 # Verified against /mnt/hdd/xuran/LlamaFactory/src/llamafactory/data/template.py.
@@ -31,6 +34,7 @@ ARCH_TO_TEMPLATE = {
     "qwen2vl":       "qwen2_vl",
     "qwen3_vl":      "qwen3_vl",
     "llava":         "llava_next",
+    "llava_ov_1_5":  "qwen2_vl",    # LLaVA-OV-1.5 uses Qwen2-VL vision pipeline; image_token=<|image_pad|>
     "kimi_vl":       "kimi_vl",
     "minicpm":       "minicpm_v",
     "minicpm_v_4_6": "minicpm_v_4_6",
@@ -132,10 +136,12 @@ class HarnessTrainer:
             # output
             "output_dir": str(output_dir),
             "logging_steps": tc.logging_steps,
+            "save_strategy": tc.save_strategy,
             "save_steps": tc.save_steps,
+            "save_total_limit": tc.save_total_limit,
             "plot_loss": True,
             "overwrite_output_dir": True,
-            "save_only_model": False,
+            "save_only_model": tc.save_only_model,
             "report_to": cfg.tracking.backend if cfg.tracking.backend != "none" else "none",
             # training
             "per_device_train_batch_size": lf_params["per_device_train_batch_size"],
@@ -146,6 +152,8 @@ class HarnessTrainer:
             "warmup_ratio": tc.warmup_ratio,
             "bf16": tc.bf16,
             "ddp_timeout": 180000000,
+            # Reentrant GC conflicts with DeepSpeed ZeRO-3 (double-backward error)
+            "use_reentrant_gc": False,
             "resume_from_checkpoint": str(tc.resume_from_checkpoint) if tc.resume_from_checkpoint else None,
         }
 
@@ -173,10 +181,14 @@ class HarnessTrainer:
             f"{src_path}:{env['PYTHONPATH']}" if env.get("PYTHONPATH") else src_path
         )
         env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+        env.setdefault("DISABLE_VERSION_CHECK", "1")
+
+        conda_exe = env.get("CONDA_EXE") or shutil.which("conda") or str(CONDA_BIN)
 
         cmd = [
-            "conda", "run", "-n", CONDA_ENV, "--no-capture-output",
+            conda_exe, "run", "-n", CONDA_ENV, "--no-capture-output",
             "torchrun",
+            f"--master_port={self._find_free_port()}",
             f"--nproc_per_node={gpu_plan.num_gpus}",
             "-m", "llamafactory.launcher",
             str(yaml_path),
@@ -195,3 +207,11 @@ class HarnessTrainer:
         """Return latest checkpoint dir or output_dir itself."""
         checkpoints = sorted(output_dir.glob("checkpoint-*"))
         return checkpoints[-1] if checkpoints else output_dir
+
+    @staticmethod
+    def _find_free_port() -> int:
+        """Reserve a free localhost TCP port for torchrun rendezvous."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            sock.listen(1)
+            return sock.getsockname()[1]

@@ -1,34 +1,9 @@
-"""
-LFInferenceBackend: thin wrapper around llamafactory.chat.ChatModel for batch
-inference on multi-image VLM prompts.
+"""LlamaFactory-backed async inference for multi-image VLM evaluation."""
 
-Replaces the previous per-architecture VLLMBackend (`harness/inference/vllm_backend.py`)
-because LF's mm_plugin system already handles every supported template's
-image-token formatting and chat-template assembly. We only orchestrate batching.
-
-Workflow:
-  1. __init__ — instantiate ChatModel with vLLM backend + model + template + adapter
-  2. generate_batch(records) — run async inference over the batch via asyncio.gather
-
-Records are expected to look like:
-  {
-    "id": int,
-    "question": str,
-    "image_path1": str,
-    "image_path2": str,
-    "category": str,           # optional
-    "sub_category": str,       # optional
-    "img_source": str,         # optional
-    "benchmark": str,          # optional
-  }
-
-Returned records inherit those fields plus "response": str.
-"""
 from __future__ import annotations
 
 import asyncio
 import os
-from pathlib import Path
 from typing import Optional
 
 from harness.gpu.allocator import InferPlan
@@ -49,7 +24,7 @@ class LFInferenceBackend:
         concurrency: int = 16,
         trust_remote_code: bool = True,
         extra_chat_args: Optional[dict] = None,
-    ):
+    ) -> None:
         self.model_path = model_path
         self.template = template
         self.adapter_path = adapter_path
@@ -64,15 +39,17 @@ class LFInferenceBackend:
         self._chat = None
         self._sem: Optional[asyncio.Semaphore] = None
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────
-
     def load(self) -> None:
-        """Instantiate ChatModel. Lazy — call before generate_batch."""
+        """Instantiate ChatModel. Call this before generate_batch()."""
         if self._chat is not None:
             return
 
         if self.infer_plan.gpu_ids:
             os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, self.infer_plan.gpu_ids))
+
+        # LlamaFactory's vLLM check rejects newer local installs in this env.
+        # The harness opts into the documented bypass so inference can continue.
+        os.environ.setdefault("DISABLE_VERSION_CHECK", "1")
 
         from llamafactory.chat import ChatModel
 
@@ -91,24 +68,33 @@ class LFInferenceBackend:
             args["adapter_name_or_path"] = self.adapter_path
         args.update(self.extra_chat_args)
 
-        self._chat = ChatModel(args)
+        try:
+            self._chat = ChatModel(args)
+        except ImportError as e:
+            if "vllm>=0.4.3,<=0.11.0" not in str(e):
+                raise
+            raise ImportError(
+                "LlamaFactory rejected the installed vLLM version even after "
+                "DISABLE_VERSION_CHECK=1 was set. Please verify the local vLLM "
+                "installation is otherwise compatible."
+            ) from e
 
     def unload(self) -> None:
         """Free GPU memory."""
         import gc
+
         try:
             import torch  # type: ignore
         except Exception:
             torch = None
+
         self._chat = None
         gc.collect()
         if torch is not None and torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-    # ── Inference ─────────────────────────────────────────────────────────
-
     def generate_batch(self, records: list[dict]) -> list[dict]:
-        """Run inference on a batch of records. Returns list of records with 'response' field."""
+        """Run inference on a batch and return records with a response field."""
         if self._chat is None:
             self.load()
         return asyncio.run(self._generate_async(records))
@@ -126,8 +112,6 @@ class LFInferenceBackend:
             img2 = record.get("image_path2") or ""
             images = [p for p in (img1, img2) if p]
 
-            # LF's mm_plugin expands `<image>` placeholders per the template's
-            # image_token. We use the ShareGPT-style content with N <image> tokens.
             placeholders = "".join("<image>\n" for _ in images)
             user_content = f"{placeholders}{question}"
             messages = [{"role": "user", "content": user_content}]

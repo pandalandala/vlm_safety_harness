@@ -24,6 +24,7 @@ from harness.evaluation import get_evaluator
 from harness.gpu.allocator import GPUAllocator
 from harness.inference.engine import BENCHMARK_REGISTRY, InferenceEngine
 from harness.training.trainer import HarnessTrainer
+from harness.utils.logger import init_session
 
 
 def _resolve_evaluator_type(benchmark_name: str) -> str:
@@ -81,6 +82,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    init_session("run_experiment", tag=args.config, category="main")
 
     cfg: ExperimentConfig = ConfigLoader.load(args.config, overrides=args.override)
     registry = ExperimentRegistry()
@@ -172,12 +174,19 @@ def main() -> None:
             print(f"  → {metrics.format_table_row()}")
 
     # ── Save metrics ──────────────────────────────────────────────────────
-    metrics_out = _merge_metrics(all_metrics)
-    with open(run_dir / "metrics.json", "w") as f:
-        json.dump(metrics_out, f, indent=2)
-
-    print(f"\n[done] Run saved to: {run_dir}")
-    print(f"[done] metrics.json written")
+    # Only write metrics.json when eval actually ran.  Leaving it absent when
+    # --skip-eval is used prevents the registry from marking this run as
+    # "completed", so a subsequent --skip-train run on another machine can
+    # still proceed to inference + evaluation normally.
+    if all_metrics:
+        metrics_out = _merge_metrics(all_metrics)
+        with open(run_dir / "metrics.json", "w") as f:
+            json.dump(metrics_out, f, indent=2)
+        print(f"\n[done] Run saved to: {run_dir}")
+        print(f"[done] metrics.json written")
+    else:
+        print(f"\n[done] Run saved to: {run_dir}")
+        print("[done] Eval skipped — metrics.json NOT written; registry will not mark this run as completed.")
 
 
 if __name__ == "__main__":

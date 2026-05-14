@@ -25,6 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from harness.utils.logger import init_session
+
 MIS_TEST_ROOT = Path("/mnt/hdd/xuran/MIS/mis_test")
 
 A_EXPERIMENT_CONFIGS = {
@@ -183,6 +185,7 @@ def run_a_experiment(exp_id: str, args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
+    init_session("run_prelim", tag=args.experiment, category="prelim")
 
     harness_root = Path(__file__).parent.parent
     probes_dir = harness_root / "results" / "prelim" / "probes"

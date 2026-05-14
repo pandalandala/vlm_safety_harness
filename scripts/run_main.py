@@ -27,6 +27,8 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from harness.utils.logger import init_session
+
 COHORT_FILE = ROOT / "configs/experiments/main/_cohort.yaml"
 
 # Map experiment id → benchmark list + slicing flags + special pipeline behaviour.
@@ -129,6 +131,7 @@ def precheck_e5(cohort_configs: list[str]) -> None:
 
 def main() -> int:
     args = parse_args()
+    init_session("run_main", tag=args.experiment_id, category="main")
 
     exp_ids = ["E1", "E2", "E3", "E5"] if args.experiment_id == "all" else [args.experiment_id]
     cohort_groups = [g.strip() for g in args.cohort.split(",") if g.strip()]
