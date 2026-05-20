@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .architecture import normalize_model_architecture
 from .schema import ExperimentConfig
 
 CONFIGS_ROOT = Path(__file__).parent.parent.parent / "configs"
@@ -124,5 +125,7 @@ class ConfigLoader:
 
         if overrides:
             data = _apply_overrides(data, overrides)
+
+        data = normalize_model_architecture(data)
 
         return ExperimentConfig(**data)

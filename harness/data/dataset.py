@@ -129,9 +129,10 @@ class HarnessDataset:
         assert isinstance(cfg_dataset, DatasetConfig)
         path = cfg_dataset.train_path if mode == "train" else cfg_dataset.test_path
         assert path is not None, f"Dataset path for mode={mode} not set in config"
+        image_root = cfg_dataset.train_image_root if mode == "train" else cfg_dataset.test_image_root
         return cls(
             data_path=path,
-            image_root=cfg_dataset.image_root or path.parent,
+            image_root=image_root or cfg_dataset.image_root or path.parent,
             mode=mode,
             max_samples=cfg_dataset.max_train_samples if mode == "train" else cfg_dataset.max_test_samples,
             categories=cfg_dataset.categories,
@@ -157,8 +158,10 @@ class HarnessDataset:
             img2 = Image.open(image_paths[1]).convert("RGB") if len(image_paths) > 1 else None
 
         cot_response = ""
+        assistant_response = ""
         if self.mode == "train" and len(r.get("conversations", [])) > 1:
-            cot_response = r["conversations"][1].get("value", "")
+            assistant_response = r["conversations"][1].get("value", "")
+            cot_response = assistant_response
 
         return {
             "id": r.get("id", idx),
@@ -177,6 +180,7 @@ class HarnessDataset:
             "path_name": r.get("path_name", ""),
             "vlm_score": r.get("vlm_score", -1),
             "cot_response": cot_response,
+            "assistant_response": assistant_response,
         }
 
     def iter_batches(self, batch_size: int) -> Iterator[list[dict]]:
@@ -234,8 +238,10 @@ class HarnessDataset:
             question = self._extract_question(r)
             image_paths = self._resolve_image_paths(r)
             cot_response = ""
+            assistant_response = ""
             if self.mode == "train" and len(r.get("conversations", [])) > 1:
-                cot_response = r["conversations"][1].get("value", "")
+                assistant_response = r["conversations"][1].get("value", "")
+                cot_response = assistant_response
 
             records.append({
                 "id": r.get("id"),
@@ -250,6 +256,7 @@ class HarnessDataset:
                 "harm_type": r.get("harm_type", ""),
                 "path_name": r.get("path_name", ""),
                 "cot_response": cot_response,
+                "assistant_response": assistant_response,
             })
         return records
 

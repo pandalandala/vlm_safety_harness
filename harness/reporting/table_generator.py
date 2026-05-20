@@ -16,7 +16,7 @@ from harness.config.registry import ExperimentRegistry
 from harness.reporting.aggregator import ResultAggregator
 
 
-METRICS = ["ASR", "RSR", "RR", "HR"]
+METRICS = ["ASR", "PR", "BR", "FPR"]
 BENCHMARKS = ["mis_easy", "mis_hard", "mis_real"]
 
 
@@ -185,12 +185,12 @@ class TableGenerator:
 
     def e1_table(self, experiment_names: list[str], fmt: str = "markdown") -> str:
         """E1 — DREAMS in-distribution headline.
-        Cols: explicit/implicit × ASR/RS/HR/FPR (8 cols).
-        Note: FPR computed on CF safe subset; here we display the per-slice ASR/RS/HR
+        Cols: explicit/implicit × ASR/PR/BR/FPR (8 cols).
+        Note: FPR computed on CF safe subset; here we display the per-slice ASR/PR/BR
         for unsafe records, plus the CF safe FPR if metrics.json contains it.
         """
         slices = ["explicit", "implicit"]
-        sub_metrics = ["ASR", "RSR", "HR", "FPR"]
+        sub_metrics = ["ASR", "PR", "BR", "FPR"]
         rows: dict[str, dict] = {}
         for name in experiment_names:
             run = self.registry.get_best_run(name)
@@ -202,8 +202,8 @@ class TableGenerator:
             for s in slices:
                 slice_m = per_ht.get(s, {})
                 row[(s, "ASR")] = slice_m.get("ASR")
-                row[(s, "RSR")] = slice_m.get("RSR")
-                row[(s, "HR")]  = slice_m.get("HR")
+                row[(s, "PR")]  = slice_m.get("PR")
+                row[(s, "BR")]  = slice_m.get("BR")
                 row[(s, "FPR")] = mblock.get("cf_false_positive_rate")
             rows[name] = row
 
@@ -212,9 +212,9 @@ class TableGenerator:
         return self._latex_2axis(rows, slices, sub_metrics)
 
     def e2_table(self, experiment_names: list[str], fmt: str = "markdown") -> str:
-        """E2 — synth/real/mix × ASR/RS/HR/FPR (12 cols)."""
+        """E2 — synth/real/mix × ASR/PR/BR/FPR (12 cols)."""
         slices = ["synth", "real", "mix"]
-        sub_metrics = ["ASR", "RSR", "HR", "FPR"]
+        sub_metrics = ["ASR", "PR", "BR", "FPR"]
         rows: dict[str, dict] = {}
         for name in experiment_names:
             run = self.registry.get_best_run(name)
@@ -226,8 +226,8 @@ class TableGenerator:
             for s in slices:
                 sm = per_st.get(s, {})
                 row[(s, "ASR")] = sm.get("ASR")
-                row[(s, "RSR")] = sm.get("RSR")
-                row[(s, "HR")]  = sm.get("HR")
+                row[(s, "PR")]  = sm.get("PR")
+                row[(s, "BR")]  = sm.get("BR")
                 row[(s, "FPR")] = mblock.get("cf_false_positive_rate")
             rows[name] = row
 

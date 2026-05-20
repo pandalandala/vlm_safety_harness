@@ -2,7 +2,7 @@
 
 ## Context
 
-DREAMS test set (`/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json`) 目前每个 sample 只有 `img_source` 等基础元数据，缺少两个关键的分析维度标签：
+DREAMS test set (`/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json`) 目前每个 sample 只有 `img_source` 等基础元数据，缺少两个关键的分析维度标签：
 
 1. **harm_visibility** (显性/隐性)：模型需不需要通过跨模态推理才能发现危害
 2. **img_type** (real/synth/mix)：样本图片的来源类型
@@ -27,7 +27,7 @@ DREAMS test set (`/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json`) 目前�
 }
 ```
 
-图片根目录：`/mnt/hdd/xuran/mis_dataset_builder/dataset/`，格式全为 PNG。
+图片根目录：`/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/`，格式全为 PNG。
 
 **img_source 实际分布**（11种pattern）：
 
@@ -95,8 +95,8 @@ MODEL = "claude-haiku-4-5"          # 最便宜，适合大批量分类
 # MODEL = "claude-opus-4-7"         # 最强
 
 API_KEY_ENV = "ANTHROPIC_API_KEY"
-TEST_JSON   = "/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json"
-IMAGE_ROOT  = "/mnt/hdd/xuran/mis_dataset_builder/dataset"
+TEST_JSON   = "/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json"
+IMAGE_ROOT  = "/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset"
 OUTPUT_JSON = "/mnt/hdd/xuran/mis_dataset_builder/labeled/test_labeled.json"
 MAX_TOKENS  = 256                    # 分类任务输出很短
 POLL_INTERVAL = 60                   # 秒

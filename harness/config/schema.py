@@ -19,6 +19,7 @@ class ModelConfig(BaseModel):
         "qwen2vl",
         "qwen3_vl",
         "llava",
+        "llava_ov_1_5",
         "kimi_vl",
         "minicpm",
         "minicpm_v_4_6",
@@ -45,6 +46,8 @@ class DatasetConfig(BaseModel):
     train_path: Optional[Path] = None
     test_path: Optional[Path] = None
     image_root: Optional[Path] = None
+    train_image_root: Optional[Path] = None
+    test_image_root: Optional[Path] = None
     categories: Optional[list[str]] = None      # None = all categories
     max_train_samples: Optional[int] = None
     max_test_samples: Optional[int] = None

@@ -2,16 +2,16 @@
 """
 Generate CoT + safety responses for DREAMS training data using Qwen3.5-122B-A10B.
 
-Reads /mnt/hdd/xuran/mis_dataset_builder/dataset/train.json (sharegpt format with
+Reads /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json (sharegpt format with
 empty `gpt` turns), runs the VLM annotator with the RESPONSE_GENERATION_SYSTEM
 prompt, fills `conversations[1]["value"]` with the generated response, and
 writes the result to train_annotated.json with per-batch checkpointing.
 
 Usage:
     python scripts/generate_responses.py \
-        --dataset /mnt/hdd/xuran/mis_dataset_builder/dataset \
+        --dataset /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset \
         --model Qwen/Qwen3.5-122B-A10B \
-        --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json \
+        --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json \
         --batch-size 4
 
 Resume is on by default; pass --no-resume to overwrite from scratch.
@@ -44,7 +44,7 @@ from harness.training.cot_generator import CoTGenerator
 from harness.utils.logger import get_logger
 
 
-DATASET_ROOT = Path("/mnt/hdd/xuran/mis_dataset_builder/dataset")
+DATASET_ROOT = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset")
 
 
 def parse_args() -> argparse.Namespace:

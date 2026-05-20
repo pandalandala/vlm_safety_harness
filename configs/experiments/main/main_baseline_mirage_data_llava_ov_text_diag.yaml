@@ -1,0 +1,18 @@
+# Diagnostic variant for MIRage-LLaVA collapse:
+# mix a small amount of text-only general instruction data to test whether
+# pure safety-only full-SFT is suppressing the model's normal generation.
+
+name: main_baseline_mirage_data_llava_ov_text_diag
+description: "Diagnostic MIRage LLaVA-OV run with alpaca text-only mixing"
+tags: [main, llava_ov, mirage_data, full-sft, tier_a, general_data, diagnostic, text_only]
+group: main
+
+_extends: experiments/main/main_baseline_mirage_data_llava_ov.yaml
+
+training:
+  general_data:
+    sources:
+      - /mnt/hdd/xuran/vlm_safety_harness/results/main/main_baseline_mirage_data_llava_ov_general_diag/manual_data_check/alpaca_text500_sharegpt.json
+    max_samples: 500
+    format: sharegpt
+    shuffle_seed: 0

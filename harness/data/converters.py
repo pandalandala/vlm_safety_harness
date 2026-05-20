@@ -16,6 +16,12 @@ from datasets import load_dataset
 
 from harness.config.schema import GeneralDataConfig
 
+M4_INSTRUCT_SNAPSHOT_ROOT = Path(
+    "/mnt2/xuran_hdd/.cache/huggingface/hub/"
+    "datasets--lmms-lab--M4-Instruct-Data/snapshots/"
+    "9078d03bb7442cef5a71771a29a2af9ec0f63134"
+)
+
 
 # ── LLaMA-Factory ──────────────────────────────────────────────────────────
 
@@ -49,10 +55,10 @@ def to_llamafactory_format(
         question = r["question"]
         human_value = f"<image>\n<image>\n{question}"
 
-        if use_cot and r.get("cot_response"):
-            response = _format_cot(r["cot_response"], cot_format)
+        if use_cot:
+            response = _format_cot(r["cot_response"], cot_format) if r.get("cot_response") else ""
         else:
-            response = ""
+            response = (r.get("assistant_response") or "").strip()
 
         images = []
         for key in ("image_path1", "image_path2"):
@@ -70,7 +76,9 @@ def to_llamafactory_format(
             ],
             "images": images,
             # Preserve metadata for debugging
-            "id": r.get("id"),
+            # Keep metadata type-stable across mixed sources so HF datasets
+            # does not fail Arrow schema inference on int-vs-str ids.
+            "id": str(r.get("id")) if r.get("id") is not None else None,
             "category": r.get("category", ""),
             "sub_category": r.get("sub_category", ""),
         })
@@ -96,16 +104,24 @@ def load_general_sharegpt_records(cfg: GeneralDataConfig) -> list[dict]:
     if cfg.format != "sharegpt":
         raise ValueError(f"Unsupported general_data format: {cfg.format}")
 
-    all_records: list[dict] = []
+    target_count = cfg.max_samples
+    compatible_records: list[dict] = []
     for source in cfg.sources:
-        all_records.extend(_load_sharegpt_records_from_source(Path(source)))
+        for record in _iter_compatible_sharegpt_records_from_source(Path(source)):
+            compatible_records.append(record)
+            if target_count is not None and len(compatible_records) >= target_count:
+                break
+        if target_count is not None and len(compatible_records) >= target_count:
+            break
 
-    if not all_records:
+    if not compatible_records:
         raise ValueError("No general-data samples loaded from configured sources.")
 
     rng = random.Random(cfg.shuffle_seed)
-    rng.shuffle(all_records)
-    return all_records
+    rng.shuffle(compatible_records)
+    if target_count is not None:
+        compatible_records = compatible_records[:target_count]
+    return compatible_records
 
 
 def resolve_general_sample_count(primary_count: int, cfg: GeneralDataConfig) -> int:
@@ -121,30 +137,34 @@ def resolve_general_sample_count(primary_count: int, cfg: GeneralDataConfig) -> 
     return max(sample_count, 1)
 
 
-def _load_sharegpt_records_from_source(source: Path) -> list[dict]:
+def _iter_compatible_sharegpt_records_from_source(source: Path):
     if source.is_file():
-        return _load_sharegpt_records_from_file(source)
+        for record in _iter_sharegpt_records_from_file(source):
+            if _is_mm_record_compatible(record):
+                yield record
+        return
 
     if not source.exists():
         raise FileNotFoundError(
             f"Configured general_data source does not exist: {source}"
         )
 
-    candidate_files = sorted(
-        [p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in {".json", ".jsonl", ".parquet"}]
-    )
-    if not candidate_files:
+    found_candidate = False
+    for path in source.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in {".json", ".jsonl", ".parquet"}:
+            continue
+        found_candidate = True
+        for record in _iter_sharegpt_records_from_file(path):
+            if _is_mm_record_compatible(record):
+                yield record
+
+    if not found_candidate:
         raise FileNotFoundError(
             f"No JSON/JSONL/Parquet files found under general_data source: {source}"
         )
 
-    loaded: list[dict] = []
-    for path in candidate_files:
-        loaded.extend(_load_sharegpt_records_from_file(path))
-    return loaded
 
-
-def _load_sharegpt_records_from_file(path: Path) -> list[dict]:
+def _iter_sharegpt_records_from_file(path: Path):
     suffix = path.suffix.lower()
     if suffix == ".json":
         with open(path) as f:
@@ -154,10 +174,12 @@ def _load_sharegpt_records_from_file(path: Path) -> list[dict]:
                 data = data["data"]
             else:
                 data = [data]
-        return [_normalize_sharegpt_record(record, path) for record in data if _looks_like_sharegpt_record(record)]
+        for record in data:
+            if _looks_like_sharegpt_record(record):
+                yield _normalize_sharegpt_record(record, path)
+        return
 
     if suffix == ".jsonl":
-        records = []
         with open(path) as f:
             for line in f:
                 line = line.strip()
@@ -165,19 +187,18 @@ def _load_sharegpt_records_from_file(path: Path) -> list[dict]:
                     continue
                 record = json.loads(line)
                 if _looks_like_sharegpt_record(record):
-                    records.append(_normalize_sharegpt_record(record, path))
-        return records
+                    yield _normalize_sharegpt_record(record, path)
+        return
 
     if suffix == ".parquet":
         dataset = load_dataset("parquet", data_files=str(path), split="train")
-        records = []
         for record in dataset:
             record = dict(record)
             if _looks_like_sharegpt_record(record):
-                records.append(_normalize_sharegpt_record(record, path))
-        return records
+                yield _normalize_sharegpt_record(record, path)
+        return
 
-    return []
+    return
 
 
 def _looks_like_sharegpt_record(record: dict) -> bool:
@@ -187,10 +208,13 @@ def _looks_like_sharegpt_record(record: dict) -> bool:
 def _normalize_sharegpt_record(record: dict, source_path: Path) -> dict:
     normalized = {
         "conversations": record["conversations"],
-        "images": _normalize_images(record.get("images") or record.get("image") or []),
+        "images": _normalize_images(
+            record.get("images") or record.get("image") or [],
+            source_path=source_path,
+        ),
     }
     if "id" in record:
-        normalized["id"] = record["id"]
+        normalized["id"] = str(record["id"])
     else:
         normalized["id"] = f"general::{source_path.name}::{len(normalized['images'])}::{hash(str(record.get('conversations')))}"
     if "category" in record:
@@ -200,14 +224,71 @@ def _normalize_sharegpt_record(record: dict, source_path: Path) -> dict:
     return normalized
 
 
-def _normalize_images(images: object) -> list[str]:
+def _normalize_images(images: object, source_path: Path) -> list[str]:
     if images is None:
         return []
     if isinstance(images, str):
-        return [images]
+        return [_resolve_image_path(images, source_path)]
     if isinstance(images, list):
-        return [str(x) for x in images if x]
+        return [_resolve_image_path(str(x), source_path) for x in images if x]
     return []
+
+
+def _resolve_image_path(image: str, source_path: Path) -> str:
+    path = Path(image)
+    if path.is_absolute():
+        return str(path)
+
+    # M4-Instruct annotations use paths relative to the snapshot root. Handle
+    # them first to avoid repeated ancestor traversal on a very large dataset.
+    if source_path.name.startswith("m4_instruct"):
+        candidate = M4_INSTRUCT_SNAPSHOT_ROOT / path
+        if candidate.exists():
+            return str(candidate)
+
+    # Try to resolve relative media paths against the dataset file directory
+    # first, then progressively against ancestor directories up to the snapshot
+    # root. If no real file is found, keep the original relative string so later
+    # compatibility filtering can drop the sample.
+    for base in (source_path.parent, *source_path.parents):
+        candidate = base / path
+        if candidate.exists():
+            return str(candidate)
+    return image
+
+
+def _is_mm_record_compatible(record: dict) -> bool:
+    """
+    Filter out ShareGPT samples that LLaMA-Factory's multimodal plugin will reject.
+
+    In practice the mixed M4-Instruct cache contains some examples where the number
+    of `<image>` placeholders in messages does not match the `images` field (for
+    example video-only or malformed multimodal rows). Those samples crash tokenizer
+    preprocessing during dataset.map(), so drop them early.
+    """
+    conversations = record.get("conversations")
+    images = record.get("images") or []
+    if not isinstance(conversations, list):
+        return False
+
+    image_token_count = 0
+    for turn in conversations:
+        if not isinstance(turn, dict):
+            return False
+        value = turn.get("value", "")
+        if not isinstance(value, str):
+            return False
+        image_token_count += value.count("<image>")
+
+    if image_token_count != len(images):
+        return False
+
+    for image in images:
+        image_path = Path(image)
+        if not image_path.is_absolute() or not image_path.exists():
+            return False
+
+    return True
 
 
 def _format_cot(raw_cot: str, fmt: str) -> str:

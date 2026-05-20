@@ -1,5 +1,16 @@
+# DEPRECATED — do NOT use for main experiments.
+# Uses the Tuwhy public checkpoint (OpenGVLab/InternVL2_5-8B-MIRage), which is banned
+# from main experiment comparisons per project rules.
+#
+# Replacement: use our 3 retrained MIRage-data models instead:
+#   configs/experiments/main/main_baseline_mirage_data_internvl3_5.yaml
+#   configs/experiments/main/main_baseline_mirage_data_qwen3_5.yaml
+#   configs/experiments/main/main_baseline_mirage_data_llava_ov.yaml
+# Checkpoints: /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_*/
+#
+# This file is kept for reference only (A experiment diagnosis of original MIRage defects).
+#
 # Baseline: MIRage (InternVL2.5-8B + MIS fine-tune) — inference only
-# Used as primary comparison baseline across all benchmarks.
 
 name: main_baseline_mis
 description: "MIRage baseline: InternVL2.5-8B + MIS fine-tune (inference only)"

@@ -9,7 +9,7 @@ prompt builders. Do NOT add new architectures here — extend
 `harness/training/trainer.py:ARCH_TO_TEMPLATE` instead.
 
 Per-architecture prompt construction adapted from
-/mnt/hdd/xuran/MIS/evaluation/inference_vllm.py (validated parameters).
+upstream MIS evaluation/inference_vllm.py (archived) (validated parameters).
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from typing import Optional
 
 from PIL import Image
 
+from harness.config.architecture import canonical_architecture
 from harness.inference.model_configs import get_model_config, VLLMModelConfig
 
 warnings.warn(
@@ -52,7 +53,7 @@ class VLLMBackend:
         max_tokens: int = 1024,
     ):
         self.model_path = model_path
-        self.architecture = architecture
+        self.architecture = canonical_architecture(architecture)
         self.tensor_parallel_size = tensor_parallel_size
         self.gpu_ids = gpu_ids
         self.temperature = temperature

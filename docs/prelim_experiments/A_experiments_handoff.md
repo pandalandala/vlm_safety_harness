@@ -11,7 +11,7 @@ You are running **4 diagnostic experiments (A1–A4)** to expose weaknesses in t
 
 The goal is to produce quantitative evidence for the **motivation section (Section 2)** of a new VLM safety paper. The narrative: MIS has fundamental dataset limitations → these experiments demonstrate them → this motivates our new DREAMS dataset.
 
-**Hard constraint**: Use ONLY MIS test data + public benchmarks. Do NOT use any data from `/mnt/hdd/xuran/mis_dataset_builder/dataset/`. Do NOT train any models.
+**Hard constraint**: Use ONLY MIS test data + public benchmarks. Do NOT use any data from `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/`. Do NOT train any models.
 
 ---
 
@@ -49,10 +49,10 @@ The goal is to produce quantitative evidence for the **motivation section (Secti
 
 | Resource | Path |
 |----------|------|
-| MIS easy (1,675 samples) | `/mnt/hdd/xuran/MIS/mis_test/mis_easy.json` |
-| MIS hard (510 samples) | `/mnt/hdd/xuran/MIS/mis_test/mis_hard.json` |
-| MIS real (100 samples) | `/mnt/hdd/xuran/MIS/mis_test/mis_real.json` |
-| MIS images root | `/mnt/hdd/xuran/MIS/mis_test/` (image paths in JSON are relative to this) |
+| MIS easy (1,675 samples) | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json` |
+| MIS hard (510 samples) | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_hard.json` |
+| MIS real (100 samples) | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_real.json` |
+| MIS images root | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/` (image paths in JSON are relative to this) |
 | MSSBench | **Download first** (see A4 section) |
 | GPT-4o eval reference | `/mnt/hdd/xuran/MIS/evaluation/gpt_eval.py` |
 | vLLM inference reference | `/mnt/hdd/xuran/MIS/evaluation/inference_vllm.py` |
@@ -263,7 +263,7 @@ A4: MIRage Consistency = X%, FPR = X% | Base avg Consistency = X%
 
 ## Important Constraints (Do Not Violate)
 
-1. Do NOT use any data from `/mnt/hdd/xuran/mis_dataset_builder/dataset/`
+1. Do NOT use any data from `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/`
 2. Do NOT train or fine-tune any model
 3. Do NOT modify files under `/mnt/hdd/xuran/MIS/`
 4. Do NOT hardcode `OPENAI_API_KEY` — read from env var

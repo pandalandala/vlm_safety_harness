@@ -1,4 +1,15 @@
 # Tier A MIRage-data baseline: LLaVA-OneVision-1.5-8B + MIS train data SFT.
+#
+# Canonical checkpoint: /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov/
+# Note: the canonical models/ symlink is intentionally pointed at an HF-compatible
+# converted export (`mirage_data_llava_ov_hfcompat`). The raw training export keeps
+# legacy key prefixes (`model.layers.*`, `visual.*`) and does not load cleanly with
+# the LLaVA-OneVision-1.5 remote code used by inference.
+# Training also inherits the HF-compatible local base
+# `/mnt/hdd/xuran/vlm_safety_harness/models/llava_ov_1_5_8b_base_hfcompat`
+# via `main_dreams_llava_ov.yaml`, so future re-trains do not fall back to the
+# raw Hub checkpoint that left the full language tower newly initialized.
+# 78server: --skip-train --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov
 
 name: main_baseline_mirage_data_llava_ov
 description: "LLaVA-OneVision-1.5-8B fine-tuned on MIS train data (Tier A retrained MIRage variant)"
@@ -11,4 +22,11 @@ dataset:
   name: mirage_data_llava_ov
   train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/mis_train.json
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
-  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train
+  train_image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train
+  test_image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
+
+training:
+  # MIS train labels are natural assistant responses, not standalone CoT blocks.
+  # Reusing the DREAMS CoT path wraps these labels in <safety_analysis> tags and
+  # leads to degenerate repetition at inference time.
+  use_cot_labels: false

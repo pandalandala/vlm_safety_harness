@@ -1,0 +1,56 @@
+{
+  "timestamp_utc": "20260519T122220Z",
+  "apply": true,
+  "targets": [
+    "our_dataset",
+    "mis_test",
+    "mis_train"
+  ],
+  "results": [
+    {
+      "name": "our_dataset",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset",
+      "src": "/mnt/hdd/xuran/mis_dataset_builder/dataset",
+      "src_broken_symlinks": 0,
+      "src_file_count": 78399,
+      "src_bytes": 43744026895,
+      "free_bytes_before": 321089282048,
+      "rsync_cmd": "rsync -aL --info=progress2 /mnt/hdd/xuran/mis_dataset_builder/dataset/ /mnt/hdd/xuran/vlm_safety_harness/data_links/.our_dataset.materialize_tmp/",
+      "tmp_remaining_symlinks": 0,
+      "tmp_file_count": 78399,
+      "tmp_bytes": 81803745880,
+      "status": "ok",
+      "elapsed_sec": 627.16
+    },
+    {
+      "name": "mis_test",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test",
+      "src": "/mnt/hdd/xuran/MIS/mis_test",
+      "src_broken_symlinks": 0,
+      "src_file_count": 4573,
+      "src_bytes": 6250753685,
+      "free_bytes_before": 239113883648,
+      "rsync_cmd": "rsync -aL --info=progress2 /mnt/hdd/xuran/MIS/mis_test/ /mnt/hdd/xuran/vlm_safety_harness/data_links/.mis_test.materialize_tmp/",
+      "tmp_remaining_symlinks": 0,
+      "tmp_file_count": 4573,
+      "tmp_bytes": 6250753685,
+      "status": "ok",
+      "elapsed_sec": 151.02
+    },
+    {
+      "name": "mis_train",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train",
+      "src": "/mnt/hdd/xuran/MIS/mis_train",
+      "src_broken_symlinks": 0,
+      "src_file_count": 7855,
+      "src_bytes": 10632933934,
+      "free_bytes_before": 232852770816,
+      "rsync_cmd": "rsync -aL --info=progress2 /mnt/hdd/xuran/MIS/mis_train/ /mnt/hdd/xuran/vlm_safety_harness/data_links/.mis_train.materialize_tmp/",
+      "tmp_remaining_symlinks": 0,
+      "tmp_file_count": 7855,
+      "tmp_bytes": 10632933934,
+      "status": "ok",
+      "elapsed_sec": 44.76
+    }
+  ]
+}

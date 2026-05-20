@@ -1,4 +1,7 @@
-# E1/E2/E5 main experiment: LLaVA-OneVision-1.5-8B + DREAMS SFT.
+# E1/E2/E3 main experiment: LLaVA-OneVision-1.5-8B + DREAMS SFT.
+#
+# Canonical checkpoint: /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov/
+# 78server: --skip-train --model-path /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov
 
 name: main_dreams_llava_ov
 description: "LLaVA-OneVision-1.5-8B fine-tuned on DREAMS dataset with structured CoT"
@@ -9,7 +12,9 @@ _extends: base/model_llava_ov_1_5_8b.yaml
 
 model:
   name: llava_ov_1_5_8b
-  hf_path: lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+  # Training must start from the converted local base; otherwise the current
+  # remote code misses the whole language tower and reinitializes it.
+  hf_path: /mnt/hdd/xuran/vlm_safety_harness/models/llava_ov_1_5_8b_base_hfcompat
   architecture: llava_ov_1_5
   size_b: 8.0
   trust_remote_code: true
@@ -20,7 +25,7 @@ dataset:
   train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
   image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
-  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+  cf_pairs_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json
 
 training:
   enabled: true
@@ -36,9 +41,13 @@ training:
   lr_scheduler_type: cosine
   warmup_ratio: 0.1
   bf16: true
-  cutoff_len: 2048
-  save_strategy: "no"
-  save_steps: 500
+  # LLaVA-OneVision expands each image into a long token block.
+  # Keep this at the model's full context so long 2-image structured CoT
+  # samples do not truncate image tokens and trigger token/feature mismatch.
+  cutoff_len: 4096
+  save_strategy: steps
+  save_steps: 100
+  save_total_limit: 1
   logging_steps: 10
 
 inference:

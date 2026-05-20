@@ -17,7 +17,7 @@
 ### 重要约束
 
 **A 实验必须在构建 DREAMS 数据集和训练自己模型之前完成**，因此只能使用：
-- MIS 已有的测试集（`/mnt/hdd/xuran/MIS/mis_test/`：easy/hard/real）
+- MIS 已有的测试集（`/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/`：easy/hard/real）
 - MIS 训练的 MIRage 模型（InternVL2.5-8B + MIS fine-tune）
 - 未经任何安全微调的基础 VLM（直接从 HF 加载）
 - 已公开的外部基准（MSSBench、FigStep 等）
@@ -40,8 +40,8 @@
 **假说**：MIRage 的安全收益部分来自文本模板识别，而非真正的视觉推理——MIS 的文本指令遵循少数固定句式（"use the object in the first image to..."），模型只需识别这些 trigger pattern 即可触发安全行为，无需看图。
 
 **数据来源**（均来自 MIS 已有测试集）：
-- `/mnt/hdd/xuran/MIS/mis_test/mis_easy.json` + images（1675条）
-- `/mnt/hdd/xuran/MIS/mis_test/mis_hard.json` + images（510条）
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json` + images（1675条）
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_hard.json` + images（510条）
 
 **实验设计**：
 - 模型：InternVL2.5-8B（base）、InternVL2.5-8B+MIRage
@@ -91,9 +91,9 @@
 **假说**：MIRage 在合成图（SD 3.5 生成）上训练，其安全能力无法泛化到真实世界图像。
 
 **数据来源**（全部来自 MIS 已有测试集）：
-- `/mnt/hdd/xuran/MIS/mis_test/mis_easy.json`（合成图主导，1675条）
-- `/mnt/hdd/xuran/MIS/mis_test/mis_hard.json`（合成图主导，510条）
-- `/mnt/hdd/xuran/MIS/mis_test/mis_real.json`（100条真实图）
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json`（合成图主导，1675条）
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_hard.json`（合成图主导，510条）
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_real.json`（100条真实图）
 
 **实验设计**：
 - 模型：InternVL2.5-8B（base）、InternVL2.5-8B+MIRage
@@ -258,9 +258,9 @@
 ├── models/                             # 微调后checkpoint（符号链接或直接存）
 │
 └── data_links/                         # 指向已有数据的符号链接
-    ├── mis_test -> /mnt/hdd/xuran/MIS/mis_test/
-    ├── mis_train -> /mnt/hdd/xuran/MIS/mis_train/
-    └── our_dataset -> /mnt/hdd/xuran/mis_dataset_builder/dataset/
+    ├── mis_test -> /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/
+    ├── mis_train -> /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/
+    └── our_dataset -> /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/
 ```
 
 ---
@@ -279,9 +279,9 @@ MIS缺陷详见: .claude/docs/MIS_shortcomes_final.md
 ## 关键路径（绝对路径）
 | 资源 | 路径 |
 |------|------|
-| 我们的数据集 | /mnt/hdd/xuran/mis_dataset_builder/dataset/ |
-| MIS基准测试集 | /mnt/hdd/xuran/MIS/mis_test/ |
-| MIS训练数据 | /mnt/hdd/xuran/MIS/mis_train/ |
+| 我们的数据集 | /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/ |
+| MIS基准测试集 | /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/ |
+| MIS训练数据 | /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/ |
 | GPT-4o评测参考 | /mnt/hdd/xuran/MIS/evaluation/gpt_eval.py |
 | vLLM推理参考 | /mnt/hdd/xuran/MIS/evaluation/inference_vllm.py |
 | LF训练模板 | /mnt/hdd/xuran/LLaMA-Factory/examples/train_full/qwen2_5vl_full_sft.yaml |
@@ -363,7 +363,7 @@ MIS缺陷详见: .claude/docs/MIS_shortcomes_final.md
 # 会话启动时自动执行，打印项目状态摘要
 
 HARNESS_ROOT="/mnt/hdd/xuran/vlm_safety_harness"
-DATASET_ROOT="/mnt/hdd/xuran/mis_dataset_builder/dataset"
+DATASET_ROOT="/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset"
 
 echo "════════════════════════════════════════"
 echo "  DREAMS VLM Safety Harness"
@@ -832,7 +832,7 @@ class ProbeBuilder:
 | `/mnt/hdd/xuran/MIS/evaluation/gpt_eval.py` | GPT-4o评测黄金协议 | PROMPT_TEMPLATE直接复用 |
 | `/mnt/hdd/xuran/MIS/evaluation/inference_vllm.py` | 各VLM架构vLLM参数 | 各架构参数直接移植 |
 | `/mnt/hdd/xuran/LLaMA-Factory/examples/train_full/qwen2_5vl_full_sft.yaml` | SFT训练配置模板 | Qwen2.5-VL可直接用此模板 |
-| `/mnt/hdd/xuran/mis_dataset_builder/dataset/scored.json` | 我们的主数据集 | 17,022条，含img_source字段 |
+| `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/scored.json` | 我们的主数据集 | 17,022条，含img_source字段 |
 | `/mnt/hdd/xuran/multi_image_safety/src/common/schema.py` | 可复用Pydantic数据模型 | HarmCategory等 |
 | `/mnt/hdd/xuran/docs/MIS_shortcomes_analysis_final_version.md` | MIS缺陷权威文档 | A实验设计核心依据 |
 

@@ -7,7 +7,7 @@ from typing import Literal, Optional
 
 from .base import Benchmark
 
-MIS_TEST_ROOT = Path("/mnt/hdd/xuran/MIS/mis_test")
+MIS_TEST_ROOT = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test")
 
 _SUBSET_META = {
     # image_path1/2 in MIS JSON are relative to MIS_TEST_ROOT (e.g. "easy_image/1/object1.png")

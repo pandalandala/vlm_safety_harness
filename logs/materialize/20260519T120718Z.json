@@ -1,0 +1,44 @@
+{
+  "timestamp_utc": "20260519T120718Z",
+  "apply": false,
+  "targets": [
+    "our_dataset",
+    "mis_test",
+    "mis_train"
+  ],
+  "results": [
+    {
+      "name": "our_dataset",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset",
+      "src": "/mnt/hdd/xuran/mis_dataset_builder/dataset",
+      "src_broken_symlinks": 0,
+      "src_file_count": 78399,
+      "src_bytes": 43744026895,
+      "free_bytes_before": 321086173184,
+      "status": "dry_run_ok",
+      "elapsed_sec": 1.85
+    },
+    {
+      "name": "mis_test",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test",
+      "src": "/mnt/hdd/xuran/MIS/mis_test",
+      "src_broken_symlinks": 0,
+      "src_file_count": 4573,
+      "src_bytes": 6250753685,
+      "free_bytes_before": 321086169088,
+      "status": "dry_run_ok",
+      "elapsed_sec": 0.12
+    },
+    {
+      "name": "mis_train",
+      "entry": "/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train",
+      "src": "/mnt/hdd/xuran/MIS/mis_train",
+      "src_broken_symlinks": 0,
+      "src_file_count": 7855,
+      "src_bytes": 10632933934,
+      "free_bytes_before": 321086169088,
+      "status": "dry_run_ok",
+      "elapsed_sec": 0.23
+    }
+  ]
+}

@@ -30,7 +30,7 @@ User-confirmed open questions (resolved 2026-05-10):
 - GLM-4.6V-Flash → use `glm4_5v` template (user-confirmed: 4.5V template runs 4.6V).
 - Closed-source (Tier C): API ids + model names provided by user at run time.
 - E4 V2/V4 general-data mix: resolved. **V2 uses 500 M4-Instruct samples; V4 uses M4-Instruct at 11% final-data ratio.** Runtime should only remind about local data availability before launch.
-- CF pair construction rule: user inspects `/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json` directly to confirm `path_name` → pair convention. Phase 2 implementation locks the rule after user confirmation.
+- CF pair construction rule: user inspects `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json` directly to confirm `path_name` → pair convention. Phase 2 implementation locks the rule after user confirmation.
 
 ---
 
@@ -271,7 +271,7 @@ class CFSynthesizer:
 
 **Build script** (`scripts/build_cf_pairs.py`):
 ```bash
-python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/mis_dataset_builder/dataset/test.json --benign-source openimages --benign-pool-size 5000 --output /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json --quality-judge gpt-4o-mini --max-retries 3
+python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json --benign-source openimages --benign-pool-size 5000 --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json --quality-judge gpt-4o-mini --max-retries 3
 ```
 
 Run **once offline**; output committed (or symlinked into `data_links/`). E5 reads `test_cf.json` directly.
@@ -283,18 +283,18 @@ Run **once offline**; output committed (or symlinked into `data_links/`). E5 rea
 python -c "
 from harness.data.dataset import HarnessDataset
 ds = HarnessDataset(
-    data_path='/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json',
-    image_root='/mnt/hdd/xuran/mis_dataset_builder/dataset',
+    data_path='/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json',
+    image_root='/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset',
     mode='eval', filter_img_source_type='real')
 print('real:', len(ds))
-ds = HarnessDataset(data_path='/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json',
-    image_root='/mnt/hdd/xuran/mis_dataset_builder/dataset',
+ds = HarnessDataset(data_path='/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json',
+    image_root='/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset',
     mode='eval', filter_harm_type='implicit')
 print('implicit:', len(ds))
 "
 
 # G5b CF synth — 50-sample dry run
-python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/mis_dataset_builder/dataset/test.json --benign-source openimages --benign-pool-size 100 --output /tmp/test_cf_smoke.json --limit 50 --skip-judge
+python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json --benign-source openimages --benign-pool-size 100 --output /tmp/test_cf_smoke.json --limit 50 --skip-judge
 ```
 
 ### Phase 3 — Configs (G6–G10)

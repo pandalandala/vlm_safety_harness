@@ -344,7 +344,7 @@ Rejected : ~4,121
 ```bash
 python3 - <<'EOF'
 import json
-r = json.load(open('/mnt/hdd/xuran/mis_dataset_builder/dataset/rejected/stage1_heuristic.json'))
+r = json.load(open('/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/rejected/stage1_heuristic.json'))
 print(f"Rejected total: {len(r)}")
 print("First rejected record keys:", list(r[0].keys()))
 print("Sample reasons:", list(set(x['rejected_reason'] for x in r[:20])))
@@ -601,7 +601,7 @@ tail -30 /mnt/hdd/xuran/mis_dataset_builder/score_vlm.log
 ```bash
 python3 - <<'EOF'
 import json
-d = json.load(open('/mnt/hdd/xuran/mis_dataset_builder/dataset/scored.json'))
+d = json.load(open('/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/scored.json'))
 no_score = sum(1 for r in d if "vlm_score" not in r)
 failed   = sum(1 for r in d if r.get("vlm_score", -1) < 1)
 translated = sum(1 for r in d if r.get("translation_en"))
@@ -805,7 +805,7 @@ import json, os
 from pathlib import Path
 from collections import Counter
 
-PROJ = Path("/mnt/hdd/xuran/mis_dataset_builder/dataset")
+PROJ = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset")
 train = json.load(open(PROJ / "train.json"))
 test  = json.load(open(PROJ / "test.json"))
 

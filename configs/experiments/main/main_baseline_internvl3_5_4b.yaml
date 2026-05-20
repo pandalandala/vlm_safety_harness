@@ -10,7 +10,7 @@ group: main
 
 model:
   name: internvl3_5_4b
-  hf_path: OpenGVLab/InternVL3_5-4B
+  hf_path: OpenGVLab/InternVL3_5-4B-HF
   architecture: internvl
   size_b: 4.0
   trust_remote_code: true
@@ -20,7 +20,7 @@ dataset:
   name: tier_b_eval_internvl3_5_4b
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
   image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
-  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+  cf_pairs_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json
 
 training:
   enabled: false

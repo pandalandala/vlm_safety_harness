@@ -27,29 +27,40 @@ class ExperimentRegistry:
     def __init__(self, results_root: Path = RESULTS_ROOT):
         self.results_root = results_root
 
-    def make_run_dir(self, cfg: ExperimentConfig) -> Path:
-        """Create and return a timestamped run directory."""
+    def make_run_dir(self, cfg: ExperimentConfig, experiment_id: str = "") -> Path:
+        """Create and return a timestamped run directory.
+
+        Path layout:
+            results/{group}/{experiment_id}/{cfg.name}/{YYYYMMDD_HHMMSS}/   (when experiment_id set)
+            results/{group}/{cfg.name}/{YYYYMMDD_HHMMSS}/                   (legacy / no experiment_id)
+        """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_dir = self.results_root / cfg.group / cfg.name / timestamp
+        if experiment_id:
+            run_dir = self.results_root / cfg.group / experiment_id / cfg.name / timestamp
+        else:
+            run_dir = self.results_root / cfg.group / cfg.name / timestamp
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save config snapshot
         snapshot_path = run_dir / "config_snapshot.yaml"
         with open(snapshot_path, "w") as f:
             yaml.dump(cfg.model_dump(mode="json"), f, default_flow_style=False, allow_unicode=True)
 
-        # Save config hash
         (run_dir / "config_hash.txt").write_text(_config_hash(cfg))
+        if experiment_id:
+            (run_dir / "experiment_id.txt").write_text(experiment_id)
 
         return run_dir
 
-    def is_completed(self, cfg: ExperimentConfig) -> Optional[Path]:
+    def is_completed(self, cfg: ExperimentConfig, experiment_id: str = "") -> Optional[Path]:
         """
         Check if an identical config has already been run successfully.
         Returns the most recent matching run_dir, or None.
         """
         cfg_hash = _config_hash(cfg)
-        group_dir = self.results_root / cfg.group / cfg.name
+        if experiment_id:
+            group_dir = self.results_root / cfg.group / experiment_id / cfg.name
+        else:
+            group_dir = self.results_root / cfg.group / cfg.name
         if not group_dir.exists():
             return None
 

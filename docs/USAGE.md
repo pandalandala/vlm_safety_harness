@@ -135,9 +135,9 @@
 │
 ├── models/                           # 微调 checkpoint 输出目录
 └── data_links/                       # 数据符号链接
-    ├── our_dataset → /mnt/hdd/xuran/mis_dataset_builder/dataset/
-    ├── mis_test    → /mnt/hdd/xuran/MIS/mis_test/
-    └── mis_train   → /mnt/hdd/xuran/MIS/mis_train/
+    ├── our_dataset → /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/
+    ├── mis_test    → /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/
+    └── mis_train   → /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/
 ```
 
 ---
@@ -243,11 +243,11 @@ source .env
 
 ```bash
 # Step 1: 生成训练响应标注
-python scripts/generate_responses.py --input /mnt/hdd/xuran/mis_dataset_builder/dataset/train.json --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume
+python scripts/generate_responses.py --input /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume
 
 # Step 2: [归档保留 / 当前不运行] 构建 E5 反事实对（需要 benign image 目录）
 # E5 counterfactual consistency 暂时取消；以下命令仅保留给未来恢复实验时参考。
-# python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/mis_dataset_builder/dataset/test.json --benign-pool /path/to/openimages_subset --output /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json --cf-images-dir /mnt/hdd/xuran/mis_dataset_builder/dataset/cf_images --swap-idx 2 --seed 0
+# python scripts/build_cf_pairs.py --test-json /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json --benign-pool /path/to/openimages_subset --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json --cf-images-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/cf_images --swap-idx 2 --seed 0
 
 # Step 3: 生成 Tier B 推理配置（从 CSV 模板）
 python scripts/generate_baseline_configs.py
@@ -306,7 +306,7 @@ huggingface-cli download lmms-lab/M4-Instruct --repo-type dataset --local-dir /m
 
 ```bash
 # [归档保留 / 当前不运行] 确认 CF 文件存在
-# ls /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+# ls /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json
 
 # [归档保留 / 当前不运行] 如未来恢复 E5，再运行该队列
 # python scripts/run_main.py --experiment-id E5 --cohort tier_a_dreams,tier_a_mirage_data
@@ -415,10 +415,10 @@ results/main/{experiment_name}/{YYYYMMDD_HHMMSS}/
 
 | 数据 | 路径 |
 |------|------|
-| DREAMS train | `/mnt/hdd/xuran/mis_dataset_builder/dataset/train.json` |
-| DREAMS test | `/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json` |
-| E5 CF pairs（归档保留，当前不使用） | `/mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json` |
-| MIS test sets | `/mnt/hdd/xuran/MIS/mis_test/{mis_easy,mis_hard,mis_real}.json` |
-| MIS train | `/mnt/hdd/xuran/MIS/mis_train/mis_train.json` |
+| DREAMS train | `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json` |
+| DREAMS test | `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json` |
+| E5 CF pairs（归档保留，当前不使用） | `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json` |
+| MIS test sets | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/{mis_easy,mis_hard,mis_real}.json` |
+| MIS train | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/mis_train.json` |
 | LlamaFactory | `/mnt/hdd/xuran/LlamaFactory` |
 | GPT-4o 评测参考 | `/mnt/hdd/xuran/MIS/evaluation/gpt_eval.py` |

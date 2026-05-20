@@ -8,9 +8,10 @@ MIS 缺陷详见: `.claude/docs/MIS_shortcomes_final.md`
 
 | 资源 | 路径 |
 |------|------|
-| 我们的数据集 | `/mnt/hdd/xuran/mis_dataset_builder/dataset/` |
-| MIS 基准测试集 | `/mnt/hdd/xuran/MIS/mis_test/` |
-| MIS 训练数据 | `/mnt/hdd/xuran/MIS/mis_train/` |
+| 我们的数据集（上游源） | `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/` |
+| MIS 基准测试集（上游源） | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/` |
+| MIS 训练数据（上游源） | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/` |
+| **实验读取路径（快照）** | `/mnt/hdd/xuran/vlm_safety_harness/data_links/{our_dataset, mis_test, mis_train}/` |
 | GPT-4o 评测参考 | `/mnt/hdd/xuran/MIS/evaluation/gpt_eval.py` |
 | vLLM 推理参考 | `/mnt/hdd/xuran/MIS/evaluation/inference_vllm.py` |
 | LF 训练模板 | `/mnt/hdd/xuran/LLaMA-Factory/examples/train_full/qwen2_5vl_full_sft.yaml` |
@@ -35,9 +36,11 @@ MIS 缺陷详见: `.claude/docs/MIS_shortcomes_final.md`
 
 ## 实验命名规范
 
-- A 实验：`results/prelim/A{1-4}_{name}/{YYYYMMDD_HHMMSS}/`
-- 主实验：`results/main/main_{model}_{dataset}/{YYYYMMDD_HHMMSS}/`
+- A 实验：`results/prelim/A{1-4}/{cfg.name}/{YYYYMMDD_HHMMSS}/`
+- 主实验：`results/main/E{1-4}/{cfg.name}/{YYYYMMDD_HHMMSS}/`
 - 消融：`results/ablation/abl_{变量}/{YYYYMMDD_HHMMSS}/`
+- `--experiment-id` 参数控制路径中的实验号（E1/E2/E3/E4/A1 等）
+- 同一 config 跑不同实验（如 E1 vs E2 vs E3）结果自动落在不同子目录
 
 ## A 实验约束
 
@@ -53,6 +56,6 @@ A 实验（prelim/）必须在构建 DREAMS 和训练自己模型之前完成：
 ## 禁止事项
 
 - 不硬编码 `OPENAI_API_KEY`（从环境变量读取）
-- 不重复存储图片原文件（`data_links/` 用符号链接）
+- `data_links/` 存放实际数据快照（无外部 symlink），由 `scripts/materialize_data_links.py` 生成；禁止再用 symlink 指向项目外路径
 - 不在 `.claude/` 目录存放实验结果
 - 不修改 `/mnt/hdd/xuran/MIS/` 下任何文件

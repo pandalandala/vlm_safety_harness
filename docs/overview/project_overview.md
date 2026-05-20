@@ -76,9 +76,9 @@ MIS weaknesses (A1-A4 diagnosis)
 ├── results/                     # Experiment outputs (per-run subdirs)
 ├── models/                      # Fine-tuned checkpoints
 └── data_links/                  # Symlinks to external data
-    ├── mis_test → /mnt/hdd/xuran/MIS/mis_test/
-    ├── mis_train → /mnt/hdd/xuran/MIS/mis_train/
-    └── our_dataset → /mnt/hdd/xuran/mis_dataset_builder/dataset/
+    ├── mis_test → /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/
+    ├── mis_train → /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/
+    └── our_dataset → /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/
 ```
 
 ---

@@ -1,0 +1,18 @@
+# Diagnostic variant for MIRage-LLaVA collapse:
+# increase text-only general instruction mixing strength to test whether a
+# larger language-preservation signal can recover normal safe responses.
+
+name: main_baseline_mirage_data_llava_ov_text_diag_999
+description: "Diagnostic MIRage LLaVA-OV run with 999 Alpaca text-only samples"
+tags: [main, llava_ov, mirage_data, full-sft, tier_a, general_data, diagnostic, text_only]
+group: main
+
+_extends: experiments/main/main_baseline_mirage_data_llava_ov.yaml
+
+training:
+  general_data:
+    sources:
+      - /mnt/hdd/xuran/vlm_safety_harness/results/main/main_baseline_mirage_data_llava_ov_general_diag/manual_data_check/alpaca_text999_sharegpt.json
+    max_samples: 999
+    format: sharegpt
+    shuffle_seed: 0

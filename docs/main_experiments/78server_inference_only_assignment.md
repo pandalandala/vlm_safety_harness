@@ -85,7 +85,7 @@ python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --
 
 归档前置条件:
 
-- `/mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json` 已存在。
+- `/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json` 已存在。
 - DREAMS/MIRage-data checkpoints 已同步。
 - 所有 `run_experiment.py` 都带 `--skip-train`。
 

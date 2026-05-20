@@ -1,11 +1,13 @@
 """
 Per-architecture vLLM initialization parameters.
-Sourced from /mnt/hdd/xuran/MIS/evaluation/inference_vllm.py (validated).
+Sourced from upstream MIS evaluation/inference_vllm.py (archived) (validated).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Optional
+
+from harness.config.architecture import canonical_architecture
 
 
 @dataclass
@@ -93,6 +95,7 @@ ARCH_CONFIGS: dict[str, VLLMModelConfig] = {
 
 
 def get_model_config(architecture: str, max_model_len: Optional[int] = None) -> VLLMModelConfig:
+    architecture = canonical_architecture(architecture)
     cfg = ARCH_CONFIGS.get(architecture)
     if cfg is None:
         raise ValueError(f"Unknown architecture: {architecture}. Supported: {list(ARCH_CONFIGS)}")

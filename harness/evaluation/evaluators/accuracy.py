@@ -57,24 +57,24 @@ class AccuracyEvaluator(BenchmarkEvaluator):
                 "correct": ok,
                 # Map into MIS-style fields for downstream code that expects them.
                 "label_str": "Safe" if ok else "Unsafe",
-                "label_perception": "Perception Level1" if ok else "Perception Level2",
+                "image1_perceived": ok,
+                "image2_perceived": ok,
+                "perceived_both": ok,
             })
 
         n = len(records) or 1
         overall = {
             "Accuracy": n_correct / n,
             "ASR": 1 - n_correct / n,  # complement, for tools that always read ASR
-            "RSR": n_correct / n,
-            "RR": 0.0,
-            "HR": 0.0,
+            "PR": n_correct / n,
+            "BR": 1 - n_correct / n,
         }
         per_category = {
             cat: {
                 "Accuracy": sum(v) / len(v),
                 "ASR": 1 - sum(v) / len(v),
-                "RSR": sum(v) / len(v),
-                "RR": 0.0,
-                "HR": 0.0,
+                "PR": sum(v) / len(v),
+                "BR": 1 - sum(v) / len(v),
             }
             for cat, v in per_cat.items()
         }

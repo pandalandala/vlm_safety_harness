@@ -41,9 +41,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output-root", default="results/main/closed_source")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--our-test-path",
-                   default="/mnt/hdd/xuran/mis_dataset_builder/dataset/test.json")
+                   default="/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json")
     p.add_argument("--our-test-image-root",
-                   default="/mnt/hdd/xuran/mis_dataset_builder/dataset")
+                   default="/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset")
     return p.parse_args()
 
 

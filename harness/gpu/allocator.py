@@ -120,7 +120,7 @@ class GPUAllocator:
     def get_available(self) -> list[GPUInfo]:
         return [g for g in self.detect() if g.is_available]
 
-    def plan_training(self, model_size_b: float) -> TrainPlan:
+    def plan_training(self, model_size_b: float, architecture: str | None = None) -> TrainPlan:
         """
         Compute optimal training plan based on model size and available GPUs.
         Target effective batch size ~ 16 tokens.
@@ -146,9 +146,15 @@ class GPUAllocator:
                 effective_batch=use_n * 2 * max(1, 8 // use_n),
             )
         elif model_size_b <= 9:
-            # 7–8B: 2–4 GPUs, ZeRO-3
+            # 7–8B: default to ZeRO-3. InternVL3.5 still uses ZeRO-2 due to a
+            # ZeRO-3 lm_head partitioning edge case in this harness. LLaVA now
+            # has a dedicated environment, so favor ZeRO-3 to avoid replicated
+            # full-parameter states causing OOM/SIGKILL during full SFT.
             use_n = min(n, 8)
-            deepspeed_config = "ds_z3_offload_config" if use_n <= 2 else "ds_z3_config"
+            if architecture == "internvl":
+                deepspeed_config = "ds_z2_config"
+            else:
+                deepspeed_config = "ds_z3_offload_config" if use_n <= 2 else "ds_z3_config"
             return TrainPlan(
                 gpu_ids=gpu_ids[:use_n],
                 num_gpus=use_n,

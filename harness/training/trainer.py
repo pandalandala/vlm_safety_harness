@@ -4,7 +4,7 @@ HarnessTrainer: wraps LLaMA-Factory SFT for multi-architecture VLM fine-tuning.
 Workflow:
   1. register_dataset() → writes to LF data/dataset_info.json
   2. build_llamafactory_yaml() → generates run-specific YAML from template
-  3. run_training() → executes torchrun in mis_safety conda env
+  3. run_training() → executes torchrun in the current conda env
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -20,12 +21,11 @@ from typing import Optional
 import yaml
 
 from harness.config.schema import ExperimentConfig, TrainingConfig
+from harness.config.architecture import canonical_architecture
 from harness.gpu.allocator import TrainPlan
 
 
 LLAMAFACTORY_ROOT = Path("/mnt/hdd/xuran/LlamaFactory")
-CONDA_ENV = "mis_safety"
-CONDA_BIN = Path("/mnt/hdd/xuran/anaconda3/bin/conda")
 
 # Maps our architecture IDs to LLaMA-Factory template names.
 # Verified against /mnt/hdd/xuran/LlamaFactory/src/llamafactory/data/template.py.
@@ -107,9 +107,11 @@ class HarnessTrainer:
         tc: TrainingConfig = cfg.training
         mc = cfg.model
 
-        template = ARCH_TO_TEMPLATE.get(mc.architecture)
+        architecture = canonical_architecture(mc.architecture)
+
+        template = ARCH_TO_TEMPLATE.get(architecture)
         if template is None:
-            raise ValueError(f"Unknown architecture: {mc.architecture}")
+            raise ValueError(f"Unknown architecture: {architecture}")
 
         lf_params = gpu_plan.to_llamafactory_params()
         deepspeed_cfg = self.lf_root / lf_params["deepspeed"]
@@ -158,7 +160,7 @@ class HarnessTrainer:
         }
 
         # Architecture-specific overrides
-        if mc.architecture in ("qwen2vl", "qwen3_vl"):
+        if architecture in ("qwen2vl", "qwen3_vl"):
             data["image_max_pixels"] = mc.max_pixels or 262144
 
         # Remove None values
@@ -183,11 +185,15 @@ class HarnessTrainer:
         env.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
         env.setdefault("DISABLE_VERSION_CHECK", "1")
 
-        conda_exe = env.get("CONDA_EXE") or shutil.which("conda") or str(CONDA_BIN)
+        # Reuse the current interpreter's environment so architecture-specific
+        # pins (for example the dedicated LLaVA env) are preserved in workers.
+        env_bin = Path(sys.executable).resolve().parent
+        torchrun_exe = env_bin / "torchrun"
+        if not torchrun_exe.exists():
+            raise FileNotFoundError(f"torchrun not found next to current interpreter: {torchrun_exe}")
 
         cmd = [
-            conda_exe, "run", "-n", CONDA_ENV, "--no-capture-output",
-            "torchrun",
+            str(torchrun_exe),
             f"--master_port={self._find_free_port()}",
             f"--nproc_per_node={gpu_plan.num_gpus}",
             "-m", "llamafactory.launcher",

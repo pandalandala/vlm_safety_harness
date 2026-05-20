@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from harness.utils.logger import init_session
 
-MIS_TEST_ROOT = Path("/mnt/hdd/xuran/MIS/mis_test")
+MIS_TEST_ROOT = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test")
 
 A_EXPERIMENT_CONFIGS = {
     "A1": "prelim/A1_textual_shortcut.yaml",
@@ -43,7 +43,13 @@ MODEL_INFO: dict[str, tuple] = {
     "OpenGVLab/InternVL3_5-8B":                      ("internvl3_5_8b",       "internvl",  8.5, True),
     "Qwen/Qwen3.5-9B":                               ("qwen3_5_9b",           "qwen2vl",   9.0, False),
     "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct":     ("llava_ov_8b",          "llava",     8.0, False),
-    # MIRage safety-SFT models (InternVL2.5-8B + MIS fine-tune)
+    # Our MIRage-data SFT models (trained on mis_train.json; canonical checkpoints under models/)
+    # Usage: --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
+    "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5": ("mirage_data_internvl3_5", "internvl", 8.5, True),
+    "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5":     ("mirage_data_qwen3_5",     "qwen2vl",  9.0, False),
+    "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov":    ("mirage_data_llava_ov",    "llava",    8.0, False),
+    # Tuwhy public checkpoints — A experiment diagnosis ONLY (banned from main experiments)
+    # Only use to diagnose original MIRage defects in prelim/A experiments.
     "Tuwhy/InternVL2.5-8B-MIRage":                  ("internvl2_5_8b_mirage","internvl",  8.0, True),
     "Tuwhy/Qwen2-VL-7B-MIRage":                     ("qwen2_vl_7b_mirage",   "qwen2vl",   7.0, False),
 }

@@ -1,5 +1,8 @@
 # Tier A MIRage-data baseline: InternVL3.5-8B + MIS train data SFT.
 # Same architecture as main_dreams_internvl3_5 — fair MIRage vs DREAMS comparison.
+#
+# Canonical checkpoint: /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5/
+# 78server: --skip-train --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
 
 name: main_baseline_mirage_data_internvl3_5
 description: "InternVL3.5-8B fine-tuned on MIS train data (Tier A retrained MIRage variant)"
@@ -12,4 +15,5 @@ dataset:
   name: mirage_data_internvl3_5
   train_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train/mis_train.json
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
-  image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train
+  train_image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/mis_train
+  test_image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset

@@ -4,10 +4,10 @@ Build counterfactual (CF) pair index for E5 evaluation.
 
 Usage (offline, run once):
     python scripts/build_cf_pairs.py \
-        --test-json /mnt/hdd/xuran/mis_dataset_builder/dataset/test.json \
+        --test-json /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json \
         --benign-pool /path/to/openimages_subset \
-        --output /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json \
-        --cf-images-dir /mnt/hdd/xuran/mis_dataset_builder/dataset/cf_images \
+        --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json \
+        --cf-images-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/cf_images \
         --swap-idx 2 --seed 0
 
 The benign pool may come from any of:

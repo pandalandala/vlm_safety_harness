@@ -68,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--force", action="store_true")
     p.add_argument("--skip-train", action="store_true",
                    help="Pass through to run_experiment.py")
+    p.add_argument(
+        "--resume-latest-train",
+        action="store_true",
+        help="Pass through to run_experiment.py so training resumes from the latest checkpoint when available",
+    )
     return p.parse_args()
 
 
@@ -89,6 +94,7 @@ def run_one(
     config_name: str,
     benchmarks: list[str],
     args: argparse.Namespace,
+    experiment_id: str = "",
 ) -> int:
     """Invoke scripts/run_experiment.py for a single config."""
     cmd = [
@@ -97,6 +103,8 @@ def run_one(
         f"main/{config_name}",
         "--benchmarks", *benchmarks,
     ]
+    if experiment_id:
+        cmd += ["--experiment-id", experiment_id]
     if args.limit:
         cmd += ["--limit", str(args.limit)]
     if args.dry_run:
@@ -105,6 +113,8 @@ def run_one(
         cmd += ["--force"]
     if args.skip_train:
         cmd += ["--skip-train"]
+    if args.resume_latest_train:
+        cmd += ["--resume-latest-train"]
 
     print(f"[run] {' '.join(cmd)}")
     if args.dry_run:
@@ -114,16 +124,16 @@ def run_one(
 
 def precheck_e5(cohort_configs: list[str]) -> None:
     """E5 requires test_cf.json. Halt with clear error if missing."""
-    cf_path = Path("/mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json")
+    cf_path = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json")
     if not cf_path.exists():
         print(
             f"\n[precheck] E5 requires CF pair file at:\n  {cf_path}\n"
             "Run scripts/build_cf_pairs.py first. Example:\n"
             "  python scripts/build_cf_pairs.py \\\n"
-            "    --test-json /mnt/hdd/xuran/mis_dataset_builder/dataset/test.json \\\n"
+            "    --test-json /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json \\\n"
             "    --benign-pool <path-to-benign-image-dir> \\\n"
-            "    --output /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json \\\n"
-            "    --cf-images-dir /mnt/hdd/xuran/mis_dataset_builder/dataset/cf_images\n",
+            "    --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json \\\n"
+            "    --cf-images-dir /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/cf_images\n",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -146,7 +156,7 @@ def main() -> int:
 
         print(f"\n=== Running {exp_id} (benchmarks={spec['benchmarks']}) ===")
         for cfg_name in cohort_configs:
-            rc = run_one(cfg_name, spec["benchmarks"], args)
+            rc = run_one(cfg_name, spec["benchmarks"], args, experiment_id=exp_id)
             if rc != 0:
                 print(f"[fail] {cfg_name} exit={rc}", file=sys.stderr)
                 if not args.dry_run:

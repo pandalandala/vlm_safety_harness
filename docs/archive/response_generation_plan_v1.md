@@ -236,7 +236,7 @@ git commit -m "feat: add full_response mode to CoTGenerator with DREAMS-optimize
 Generate CoT + safety responses for DREAMS training data using Qwen3.5-122B-A10B.
 
 Usage:
-    python scripts/generate_responses.py --dataset /mnt/hdd/xuran/mis_dataset_builder/dataset --model Qwen/Qwen3.5-122B-A10B --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json --batch-size 4 --resume
+    python scripts/generate_responses.py --dataset /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset --model Qwen/Qwen3.5-122B-A10B --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json --batch-size 4 --resume
 """
 import argparse
 import json
@@ -249,7 +249,7 @@ from harness.gpu.allocator import GPUAllocator
 from harness.training.cot_generator import CoTGenerator
 
 
-DATASET_ROOT = Path("/mnt/hdd/xuran/mis_dataset_builder/dataset")
+DATASET_ROOT = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset")
 
 
 def parse_args() -> argparse.Namespace:
@@ -431,7 +431,7 @@ Expected: Response starts with `<safety_analysis>`, contains all 3 steps + Concl
 
 ```bash
 cd /mnt/hdd/xuran/vlm_safety_harness
-python scripts/generate_responses.py --model Qwen/Qwen3.5-122B-A10B --batch-size 4 --max-tokens 768 --output /mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json --resume
+python scripts/generate_responses.py --model Qwen/Qwen3.5-122B-A10B --batch-size 4 --max-tokens 768 --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json --resume
 ```
 
 Expected runtime: ~15,319 samples ÷ 4 batch × ~10s/batch ≈ 6–10 hours (depending on GPU speed).
@@ -441,7 +441,7 @@ Expected runtime: ~15,319 samples ÷ 4 batch × ~10s/batch ≈ 6–10 hours (dep
 ```bash
 python3 -c "
 import json
-d = json.load(open('/mnt/hdd/xuran/mis_dataset_builder/dataset/train_annotated.json'))
+d = json.load(open('/mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json'))
 total = len(d)
 filled = sum(1 for r in d if r['conversations'][1]['value'].strip())
 has_cot = sum(1 for r in d if '<safety_analysis>' in r['conversations'][1]['value'])

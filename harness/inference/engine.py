@@ -16,7 +16,7 @@ from typing import Optional
 
 from harness.config.schema import ExperimentConfig, InferenceConfig
 from harness.gpu.allocator import InferPlan
-from harness.inference.lf_backend import LFInferenceBackend
+from harness.inference.lf_backend import EngineCrashedError, LFInferenceBackend
 from harness.training.trainer import ARCH_TO_TEMPLATE
 
 # Benchmark name → loader spec.
@@ -68,7 +68,8 @@ class InferenceEngine:
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
 
-        self._backend: Optional[LFInferenceBackend] = None
+        self._backend = None
+        self._safe_mode_enabled = False
 
     def run_all_benchmarks(
         self,
@@ -87,11 +88,6 @@ class InferenceEngine:
         try:
             for bname in bmarks:
                 out_path = self.output_dir / "responses" / f"{bname}.jsonl"
-                if resume and out_path.exists():
-                    print(f"[skip] {bname}: output exists at {out_path}")
-                    results[bname] = out_path
-                    continue
-
                 records = self._load_benchmark(bname, max_samples)
                 print(f"[infer] {bname}: {len(records)} samples")
                 out_path = self._run_benchmark(bname, records, out_path)
@@ -113,6 +109,17 @@ class InferenceEngine:
                 f"Update ARCH_TO_TEMPLATE in harness/training/trainer.py."
             )
 
+        if mc.architecture == "minicpm_v_4_6":
+            from harness.inference.minicpm_v46_native_backend import MiniCPMV46NativeBackend
+
+            self._backend = MiniCPMV46NativeBackend(
+                model_path=self.model_path,
+                max_new_tokens=ic.max_tokens,
+                temperature=ic.temperature,
+            )
+            self._backend.load()
+            return
+
         self._backend = LFInferenceBackend(
             model_path=self.model_path,
             template=template,
@@ -122,36 +129,152 @@ class InferenceEngine:
             max_model_len=mc.max_model_len,
             concurrency=ic.concurrency,
             trust_remote_code=mc.trust_remote_code,
+            image_min_pixels=mc.min_pixels,
+            image_max_pixels=mc.max_pixels,
+            infer_backend=self._resolve_lf_infer_backend(),
         )
         self._backend.load()
+
+    def _resolve_lf_infer_backend(self) -> str:
+        backend = self.cfg.inference.backend
+        architecture = self.cfg.model.architecture
+
+        if backend == "hf":
+            return "huggingface"
+
+        if backend == "lf_vllm" and architecture in {"internvl", "llava", "llava_ov_1_5"}:
+            # In the current stack, InternVL responds coherently with HF while the
+            # vLLM path emits garbled text; LLaVA-OneVision-1.5 is outright
+            # unsupported by vLLM. Keep both the legacy `llava` alias and the
+            # explicit `llava_ov_1_5` architecture on the HF path.
+            return "huggingface"
+
+        return "vllm"
 
     def _run_benchmark(self, name: str, records: list[dict], out_path: Path) -> Path:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Resume: find already-processed IDs
-        done_ids: set = set()
-        if out_path.exists():
-            with open(out_path) as f:
-                for line in f:
-                    try:
-                        done_ids.add(json.loads(line.strip())["id"])
-                    except Exception:
-                        pass
+        # Resume only keeps successful records. Failed inference rows are retried.
+        existing_successes = self._load_existing_successes(out_path)
+        if existing_successes:
+            print(f"[resume] {name}: keeping {len(existing_successes)} successful rows from {out_path}")
 
-        pending = [r for r in records if r.get("id") not in done_ids]
+        pending = [r for r in records if r.get("id") not in existing_successes]
         if not pending:
             return out_path
 
-        with open(out_path, "a") as f:
-            for i in range(0, len(pending), self.batch_size):
-                batch = pending[i: i + self.batch_size]
-                outputs = self._backend.generate_batch(batch)
-                for out in outputs:
-                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
-                f.flush()
-                print(f"  [{name}] {min(i + self.batch_size, len(pending))}/{len(pending)}")
+        generated_by_id: dict = {}
+        processed = 0
+        for i in range(0, len(pending), self.batch_size):
+            batch = pending[i: i + self.batch_size]
+            outputs = self._generate_with_recovery(batch)
+            for out in outputs:
+                generated_by_id[out["id"]] = out
+            processed += len(batch)
+            print(f"  [{name}] {processed}/{len(pending)}")
+
+        with open(out_path, "w") as f:
+            for record in records:
+                rid = record.get("id")
+                out = existing_successes.get(rid) or generated_by_id.get(rid)
+                if out is None:
+                    raise RuntimeError(f"Missing inference output for id={rid} in benchmark {name}.")
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+            f.flush()
 
         return out_path
+
+    def _load_existing_successes(self, out_path: Path) -> dict:
+        successes: dict = {}
+        if not out_path.exists():
+            return successes
+
+        with open(out_path) as f:
+            for line in f:
+                try:
+                    row = json.loads(line.strip())
+                except Exception:
+                    continue
+                rid = row.get("id")
+                if rid is None or self._is_retryable_error_output(row):
+                    continue
+                successes[rid] = row
+        return successes
+
+    @staticmethod
+    def _is_retryable_error_output(row: dict) -> bool:
+        return "[INFERENCE_ERROR]" in str(row.get("response", ""))
+
+    def _generate_with_recovery(self, records: list[dict]) -> list[dict]:
+        assert self._backend is not None
+        try:
+            outputs = self._backend.generate_batch(records)
+        except EngineCrashedError as e:
+            print(f"[recover] engine crash in batch of {len(records)}: {e}")
+            return self._recover_records(records)
+
+        error_rows = [out for out in outputs if self._is_retryable_error_output(out)]
+        if not error_rows:
+            return outputs
+
+        error_ids = [out.get("id") for out in error_rows]
+        print(f"[recover] retrying {len(error_rows)} inference errors in safe mode: ids={error_ids}")
+        recovered = self._recover_records(
+            [record for record in records if record.get("id") in set(error_ids)]
+        )
+        recovered_by_id = {row["id"]: row for row in recovered}
+        return [recovered_by_id.get(out["id"], out) for out in outputs]
+
+    def _recover_records(self, records: list[dict]) -> list[dict]:
+        self._enable_safe_mode()
+        recovered: list[dict] = []
+        for record in records:
+            recovered.append(self._infer_single_with_retries(record))
+        return recovered
+
+    def _enable_safe_mode(self) -> None:
+        assert self._backend is not None
+        if self._safe_mode_enabled:
+            return
+
+        self._safe_mode_enabled = True
+        print("[recover] switching backend to safe mode (vllm_enforce_eager=true, concurrency=1)")
+        self._backend.restart(safe_mode=True, concurrency=1)
+
+    def _restart_safe_backend(self) -> None:
+        assert self._backend is not None
+        self._safe_mode_enabled = True
+        print("[recover] restarting safe-mode backend")
+        self._backend.restart(safe_mode=True, concurrency=1)
+
+    def _infer_single_with_retries(self, record: dict, max_attempts: int = 3) -> dict:
+        assert self._backend is not None
+        last_error: Optional[str] = None
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                [out] = self._backend.generate_batch([record])
+            except EngineCrashedError as e:
+                last_error = f"{type(e).__name__}: {e}"
+                if attempt < max_attempts:
+                    self._restart_safe_backend()
+                    continue
+                break
+
+            if not self._is_retryable_error_output(out):
+                return out
+
+            last_error = str(out.get("response", ""))
+            if attempt < max_attempts:
+                self._restart_safe_backend()
+
+        msg = (
+            f"[INFERENCE_ERROR] RecoveryFailed: exhausted {max_attempts} safe-mode attempts"
+            f" for id={record.get('id')}"
+        )
+        if last_error:
+            msg = f"{msg}; last_error={last_error}"
+        return LFInferenceBackend.build_result(record, msg)
 
     def _load_benchmark(self, name: str, max_samples: Optional[int]) -> list[dict]:
         from harness.config.schema import DatasetConfig

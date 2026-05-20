@@ -1,0 +1,18 @@
+# Diagnostic variant for MIRage-LLaVA collapse:
+# mix a small amount of general multimodal instruction data to preserve
+# base descriptive/generative competence during safety tuning.
+
+name: main_baseline_mirage_data_llava_ov_general_diag
+description: "Diagnostic MIRage LLaVA-OV run with M4-Instruct mixing"
+tags: [main, llava_ov, mirage_data, full-sft, tier_a, general_data, diagnostic]
+group: main
+
+_extends: experiments/main/main_baseline_mirage_data_llava_ov.yaml
+
+training:
+  general_data:
+    sources:
+      - /mnt2/xuran_hdd/.cache/huggingface/hub/datasets--lmms-lab--M4-Instruct-Data/snapshots/9078d03bb7442cef5a71771a29a2af9ec0f63134/m4_instruct_annotations.json
+    max_samples: 500
+    format: sharegpt
+    shuffle_seed: 0

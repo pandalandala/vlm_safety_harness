@@ -13,14 +13,14 @@ model:
   hf_path: lmms-lab/LLaVA-OneVision-1.5-4B-Instruct
   architecture: llava_ov_1_5
   size_b: 4.0
-  trust_remote_code: false
+  trust_remote_code: true
   max_model_len: 8192
 
 dataset:
   name: tier_b_eval_llava_ov_1_5_4b
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
   image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
-  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+  cf_pairs_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json
 
 training:
   enabled: false

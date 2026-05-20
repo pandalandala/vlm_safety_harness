@@ -56,8 +56,8 @@ MIS 文本指令遵循固定句式（"use the object in the first image to..."�
 ### Data Sources
 | Split | Path | Samples |
 |-------|------|---------|
-| MIS-easy | `/mnt/hdd/xuran/MIS/mis_test/mis_easy.json` | 1,675 |
-| MIS-hard | `/mnt/hdd/xuran/MIS/mis_test/mis_hard.json` | 510 |
+| MIS-easy | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_easy.json` | 1,675 |
+| MIS-hard | `/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test/mis_hard.json` | 510 |
 
 **Probe construction** (`scripts/run_prelim.py --build-probes --experiment A1`):
 - Condition A: original dual-image input

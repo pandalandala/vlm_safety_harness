@@ -20,7 +20,7 @@ dataset:
   name: tier_b_eval___MODEL_NAME__
   test_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test.json
   image_root: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset
-  cf_pairs_path: /mnt/hdd/xuran/mis_dataset_builder/dataset/test_cf.json
+  cf_pairs_path: /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/test_cf.json
 
 training:
   enabled: false

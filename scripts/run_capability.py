@@ -90,6 +90,7 @@ def main() -> int:
             sys.executable,
             str(ROOT / "scripts/run_experiment.py"),
             str(cfg_path.relative_to(ROOT / "configs")),
+            "--experiment-id", "E4",
             "--benchmarks", *args.benchmarks,
         ]
         if args.limit:
