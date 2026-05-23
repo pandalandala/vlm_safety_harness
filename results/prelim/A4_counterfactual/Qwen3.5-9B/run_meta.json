@@ -1,0 +1,8 @@
+{
+  "model_path": "Qwen/Qwen3.5-9B",
+  "model_tag": "Qwen3.5-9B",
+  "config_name": "A4_counterfactual",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260523_154434"
+}

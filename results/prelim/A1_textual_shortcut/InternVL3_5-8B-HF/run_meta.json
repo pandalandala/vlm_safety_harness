@@ -1,0 +1,8 @@
+{
+  "model_path": "OpenGVLab/InternVL3_5-8B-HF",
+  "model_tag": "InternVL3_5-8B-HF",
+  "config_name": "A1_textual_shortcut",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260522_031258"
+}

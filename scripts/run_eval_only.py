@@ -17,6 +17,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from harness.evaluation import get_evaluator
 from harness.evaluation.gpt4o_evaluator import GPT4oEvaluator
 from harness.inference.engine import BENCHMARK_REGISTRY
+from harness.utils.env import load_project_env, resolve_eval_model
+
+RESULTS_ROOT = Path(__file__).parent.parent / "results"
+
+
+def resolve_responses_dir(args) -> Path:
+    """Locate responses dir, explicitly or by (config, experiment, model-tag).
+
+    New layout: results/{group}/{experiment_id}/{config}/{model_tag}/responses/
+    The triple is deterministic — no `ls -td` guessing, never picks the wrong model.
+    """
+    if args.responses:
+        return Path(args.responses)
+    if not (args.config and args.model_tag):
+        raise SystemExit(
+            "Provide --responses, OR --config + --model-tag (plus optional "
+            "--experiment-id / --group) to auto-locate the responses dir."
+        )
+    base = RESULTS_ROOT / args.group
+    if args.experiment_id:
+        base = base / args.experiment_id
+    return base / args.config / args.model_tag / "responses"
 
 
 def _merge_metrics(existing_metrics: dict, all_metrics: dict[str, dict]) -> dict:
@@ -33,9 +55,17 @@ def _merge_metrics(existing_metrics: dict, all_metrics: dict[str, dict]) -> dict
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--responses", required=True, help="Directory containing *.jsonl response files")
+    p.add_argument("--responses", default=None, help="Directory containing *.jsonl response files")
+    p.add_argument("--config", default=None, help="Config name, e.g. main_dreams_internvl3_5 (auto-locate mode)")
+    p.add_argument("--model-tag", default=None, help="Model tag, e.g. dreams_internvl3_5 (auto-locate mode)")
+    p.add_argument("--experiment-id", default=None, help="Experiment id, e.g. E1/E3 (auto-locate mode)")
+    p.add_argument("--group", default="main", help="Results group (default: main; auto-locate mode)")
     p.add_argument("--output-dir", default=None, help="Output dir for eval results (default: responses/../eval_results)")
-    p.add_argument("--judge", default="gpt-4o", choices=["gpt-4o", "gpt-4o-mini", "llama_guard"])
+    p.add_argument(
+        "--judge",
+        default="gpt-4o",
+        help="Judge model id, e.g. gpt-4o, gpt-4o-mini, gpt-4o-mini-2024-07-18, or llama_guard.",
+    )
     p.add_argument("--resume", action="store_true", default=True)
     p.add_argument("--benchmarks", nargs="*", default=None, help="Only evaluate specific benchmarks")
     p.add_argument(
@@ -81,8 +111,13 @@ def _build_evaluator(args, benchmark_name: str, output_jsonl: Path):
 
 
 def main() -> None:
+    load_project_env()
     args = parse_args()
-    responses_dir = Path(args.responses)
+    if "--judge" not in sys.argv:
+        args.judge = resolve_eval_model(args.judge, use_env_override=True)
+    responses_dir = resolve_responses_dir(args)
+    if not responses_dir.exists():
+        raise SystemExit(f"Responses dir not found: {responses_dir}")
     eval_dir = Path(args.output_dir) if args.output_dir else responses_dir.parent / "eval_results"
     eval_dir.mkdir(parents=True, exist_ok=True)
 

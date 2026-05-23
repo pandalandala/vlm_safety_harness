@@ -27,6 +27,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from harness.utils.env import load_project_env
 from harness.utils.logger import init_session
 
 COHORT_FILE = ROOT / "configs/experiments/main/_cohort.yaml"
@@ -73,6 +74,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Pass through to run_experiment.py so training resumes from the latest checkpoint when available",
     )
+    p.add_argument("--cuda-visible-devices", default=None, metavar="IDS",
+                   help="GPU IDs to expose (e.g. '0' or '0,1,2,3'); passed through to run_experiment.py")
     return p.parse_args()
 
 
@@ -115,6 +118,8 @@ def run_one(
         cmd += ["--skip-train"]
     if args.resume_latest_train:
         cmd += ["--resume-latest-train"]
+    if args.cuda_visible_devices is not None:
+        cmd += ["--cuda-visible-devices", args.cuda_visible_devices]
 
     print(f"[run] {' '.join(cmd)}")
     if args.dry_run:
@@ -140,6 +145,7 @@ def precheck_e5(cohort_configs: list[str]) -> None:
 
 
 def main() -> int:
+    load_project_env()
     args = parse_args()
     init_session("run_main", tag=args.experiment_id, category="main")
 

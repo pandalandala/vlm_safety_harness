@@ -30,7 +30,7 @@ training:
   enabled: false          # A experiments: no training
 
 inference:
-  backend: vllm
+  backend: hf
   benchmarks:
     - mis_easy            # Condition A: original images (easy)
     - mis_hard            # Condition A: original images (hard)

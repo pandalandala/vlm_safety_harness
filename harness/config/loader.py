@@ -11,6 +11,7 @@ import yaml
 
 from .architecture import normalize_model_architecture
 from .schema import ExperimentConfig
+from ..utils.env import load_project_env, resolve_eval_model
 
 CONFIGS_ROOT = Path(__file__).parent.parent.parent / "configs"
 
@@ -101,6 +102,8 @@ class ConfigLoader:
         Returns:
             Validated ExperimentConfig
         """
+        load_project_env()
+
         path = Path(config_path)
         if not path.is_absolute():
             # Try relative to configs/experiments/ first, then configs/
@@ -122,6 +125,11 @@ class ConfigLoader:
             data = yaml.safe_load(f) or {}
 
         data = _resolve_extends(data, path)
+        data.setdefault("evaluation", {})
+        data["evaluation"]["model"] = resolve_eval_model(
+            data["evaluation"].get("model", "gpt-4o"),
+            use_env_override=True,
+        )
 
         if overrides:
             data = _apply_overrides(data, overrides)

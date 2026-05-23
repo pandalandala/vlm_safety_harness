@@ -1,0 +1,8 @@
+{
+  "model_path": "/mnt/hdd/xuran/vlm_safety_harness/models/llava_ov_1_5_8b_base_hfcompat",
+  "model_tag": "llava_ov_1_5_8b_base_hfcompat",
+  "config_name": "A1_textual_shortcut",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260523_154152"
+}

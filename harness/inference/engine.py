@@ -11,6 +11,8 @@ Orchestrates:
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -51,6 +53,18 @@ BENCHMARK_REGISTRY: dict[str, str] = {
     "probe_text_only_hard": "_probe",
     "probe_relation_types": "_probe",
 }
+
+
+# The LlamaFactory HuggingFace backend has no engine-level batching: each
+# achat() is one blocking model.generate() in its own thread guarded by a
+# semaphore. concurrency>1 therefore runs N independent generate loops on a
+# single GPU (GIL + KV-cache contention) instead of a real batch — slower than
+# serial and prone to OOM. Cap it. Full-resolution images also dominate
+# per-sample latency, so default to the project's standard pixel cap when the
+# config does not set one explicitly.
+HF_MAX_CONCURRENCY = 16
+HF_DEFAULT_MAX_PIXELS = 1_003_520  # 1280 * 28 * 28, matches the Qwen-VL configs
+LLAVA_INFER_ENV = "mis_safety_llava453"
 
 
 class InferenceEngine:
@@ -102,6 +116,23 @@ class InferenceEngine:
         mc = self.cfg.model
         ic: InferenceConfig = self.cfg.inference
 
+        if mc.architecture == "llava_ov_1_5":
+            self._assert_llava_infer_env()
+
+        # DeepSeek-VL2 has no LF template; drive vLLM natively (inference-only).
+        if mc.architecture == "deepseek_vl2":
+            from harness.inference.deepseek_vl2_native_backend import DeepseekVL2NativeBackend
+
+            self._backend = DeepseekVL2NativeBackend(
+                model_path=self.model_path,
+                infer_plan=self.infer_plan,
+                max_new_tokens=ic.max_tokens,
+                temperature=ic.temperature,
+                max_model_len=mc.max_model_len,
+            )
+            self._backend.load()
+            return
+
         template = ARCH_TO_TEMPLATE.get(mc.architecture)
         if template is None:
             raise ValueError(
@@ -120,6 +151,18 @@ class InferenceEngine:
             self._backend.load()
             return
 
+        resolved_backend = self._resolve_lf_infer_backend()
+        concurrency = ic.concurrency
+        image_max_pixels = mc.max_pixels
+        if resolved_backend == "huggingface":
+            concurrency = min(concurrency, HF_MAX_CONCURRENCY)
+            if image_max_pixels is None:
+                image_max_pixels = HF_DEFAULT_MAX_PIXELS
+            print(
+                f"[infer] HF backend: concurrency {ic.concurrency}->{concurrency}, "
+                f"max_pixels={image_max_pixels} (no engine batching on single GPU)"
+            )
+
         self._backend = LFInferenceBackend(
             model_path=self.model_path,
             template=template,
@@ -127,13 +170,37 @@ class InferenceEngine:
             max_new_tokens=ic.max_tokens,
             temperature=ic.temperature,
             max_model_len=mc.max_model_len,
-            concurrency=ic.concurrency,
+            concurrency=concurrency,
             trust_remote_code=mc.trust_remote_code,
             image_min_pixels=mc.min_pixels,
-            image_max_pixels=mc.max_pixels,
-            infer_backend=self._resolve_lf_infer_backend(),
+            image_max_pixels=image_max_pixels,
+            infer_backend=resolved_backend,
         )
         self._backend.load()
+
+    @staticmethod
+    def _current_conda_env_name() -> str:
+        # Prefer sys.executable path (reliable even when conda env is not activated
+        # in the shell, e.g. when invoked via /path/to/env/bin/python directly).
+        exe_parts = Path(sys.executable).resolve().parts
+        for idx, part in enumerate(exe_parts[:-1]):
+            if part == "envs" and idx + 1 < len(exe_parts):
+                return exe_parts[idx + 1]
+        # Fall back to CONDA_DEFAULT_ENV for edge cases.
+        return os.environ.get("CONDA_DEFAULT_ENV", "").strip()
+
+    def _assert_llava_infer_env(self) -> None:
+        env_name = self._current_conda_env_name()
+        if env_name == LLAVA_INFER_ENV:
+            return
+
+        raise RuntimeError(
+            "LLaVA-OneVision-1.5 inference must run in the "
+            f"`{LLAVA_INFER_ENV}` conda env. "
+            f"Current env: `{env_name or 'unknown'}` (python={sys.executable}). "
+            "The older `mis_safety_llava` env is known to produce malformed fake-bad "
+            "outputs such as empty strings, `The image.`, and `Question: What is the image?`."
+        )
 
     def _resolve_lf_infer_backend(self) -> str:
         backend = self.cfg.inference.backend
@@ -142,11 +209,13 @@ class InferenceEngine:
         if backend == "hf":
             return "huggingface"
 
-        if backend == "lf_vllm" and architecture in {"internvl", "llava", "llava_ov_1_5"}:
-            # In the current stack, InternVL responds coherently with HF while the
-            # vLLM path emits garbled text; LLaVA-OneVision-1.5 is outright
-            # unsupported by vLLM. Keep both the legacy `llava` alias and the
-            # explicit `llava_ov_1_5` architecture on the HF path.
+        if architecture in {"internvl", "llava_ov_1_5"}:
+            # InternVL emits garbled text via vLLM in the current stack;
+            # LLaVA-OneVision-1.5 is outright unsupported by vLLM.
+            # Always route both to HF regardless of configured backend.
+            return "huggingface"
+
+        if backend == "lf_vllm" and architecture == "llava":
             return "huggingface"
 
         return "vllm"
@@ -203,7 +272,18 @@ class InferenceEngine:
 
     @staticmethod
     def _is_retryable_error_output(row: dict) -> bool:
-        return "[INFERENCE_ERROR]" in str(row.get("response", ""))
+        resp = str(row.get("response", ""))
+        if "[INFERENCE_ERROR]" in resp:
+            return True
+        # Reject known garbage patterns produced by mis_safety_llava (transformers 5.8.0.dev0).
+        # These are silent failures: no exception is raised but output is degenerate.
+        stripped = resp.strip()
+        if len(stripped) < 8:
+            return True
+        _GARBAGE_PREFIXES = ("The image", "You are", "Question: What")
+        if any(stripped.startswith(p) and len(stripped) < 30 for p in _GARBAGE_PREFIXES):
+            return True
+        return False
 
     def _generate_with_recovery(self, records: list[dict]) -> list[dict]:
         assert self._backend is not None
@@ -236,14 +316,21 @@ class InferenceEngine:
         assert self._backend is not None
         if self._safe_mode_enabled:
             return
-
         self._safe_mode_enabled = True
+        if getattr(self._backend, "infer_backend", None) == "huggingface":
+            # HF backend has no vLLM engine to enforce-eager; restarting just
+            # reloads 8B weights for zero benefit and drops concurrency to 1.
+            print("[recover] HF backend: skipping safe-mode restart (enforce_eager N/A)")
+            return
         print("[recover] switching backend to safe mode (vllm_enforce_eager=true, concurrency=1)")
         self._backend.restart(safe_mode=True, concurrency=1)
 
     def _restart_safe_backend(self) -> None:
         assert self._backend is not None
         self._safe_mode_enabled = True
+        if getattr(self._backend, "infer_backend", None) == "huggingface":
+            print("[recover] HF backend: skipping safe-mode restart (enforce_eager N/A)")
+            return
         print("[recover] restarting safe-mode backend")
         self._backend.restart(safe_mode=True, concurrency=1)
 

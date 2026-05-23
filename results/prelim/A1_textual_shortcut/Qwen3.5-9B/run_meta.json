@@ -1,0 +1,8 @@
+{
+  "model_path": "Qwen/Qwen3.5-9B",
+  "model_tag": "Qwen3.5-9B",
+  "config_name": "A1_textual_shortcut",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260522_025503"
+}

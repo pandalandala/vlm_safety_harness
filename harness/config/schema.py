@@ -27,6 +27,9 @@ class ModelConfig(BaseModel):
         "gemma_vlm",
         "glm4v",
         "glm4_5v",
+        # Inference-only (no LF template); driven natively via vLLM in
+        # harness/inference/deepseek_vl2_native_backend.py.
+        "deepseek_vl2",
         # Special placeholder for Tier C closed-source experiments
         # (no LF training; inference goes through scripts/run_closed_source.py).
         "closed_source",
@@ -121,7 +124,7 @@ class InferenceConfig(BaseModel):
 
 
 class EvalConfig(BaseModel):
-    model: Literal["gpt-4o", "gpt-4o-mini", "llama_guard"] = "gpt-4o"
+    model: str = "gpt-4o"
     api_key_env: str = "OPENAI_API_KEY"
     max_concurrent_requests: int = 20
     max_tokens: int = 128

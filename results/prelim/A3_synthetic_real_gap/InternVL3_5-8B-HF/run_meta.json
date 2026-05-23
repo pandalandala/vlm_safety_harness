@@ -1,0 +1,8 @@
+{
+  "model_path": "OpenGVLab/InternVL3_5-8B-HF",
+  "model_tag": "InternVL3_5-8B-HF",
+  "config_name": "A3_synthetic_real_gap",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260522_221227"
+}

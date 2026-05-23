@@ -1,0 +1,8 @@
+{
+  "model_path": "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5",
+  "model_tag": "mirage_data_internvl3_5",
+  "config_name": "A4_counterfactual",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260523_154443"
+}

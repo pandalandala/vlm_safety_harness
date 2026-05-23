@@ -4,13 +4,13 @@
 # it has placeholders that must be substituted.
 
 name: main_baseline_minicpm_o_4_5
-description: "MiniCPM-o-2.6 (Tier B 7-9B class — multimodal omni)"
+description: "MiniCPM-o-4.5 (Tier B 7-9B class — multimodal omni)"
 tags: [main, tier_b, inference-only]
 group: main
 
 model:
   name: minicpm_o_4_5
-  hf_path: openbmb/MiniCPM-o-2_6
+  hf_path: openbmb/MiniCPM-o-4_5
   architecture: minicpm_o
   size_b: 8.0
   trust_remote_code: true

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -23,22 +24,54 @@ def _config_hash(cfg: ExperimentConfig) -> str:
     return hashlib.sha256(serialized.encode()).hexdigest()[:16]
 
 
+def model_tag_from(source: str, fallback: str = "model") -> str:
+    """Derive a stable, filesystem-safe tag identifying the model used in a run.
+
+    Uses the basename of the model path / HF id so that base vs SFT models
+    (which may share the same config) land in distinct, traceable directories.
+
+      /mnt/.../models/dreams_internvl3_5      -> dreams_internvl3_5
+      OpenGVLab/InternVL3_5-8B-HF             -> InternVL3_5-8B-HF
+      Qwen/Qwen3.5-9B                         -> Qwen3.5-9B
+    """
+    p = (source or "").rstrip("/")
+    name = Path(p).name if p else ""
+    tag = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    return tag or fallback
+
+
 class ExperimentRegistry:
     def __init__(self, results_root: Path = RESULTS_ROOT):
         self.results_root = results_root
 
-    def make_run_dir(self, cfg: ExperimentConfig, experiment_id: str = "") -> Path:
-        """Create and return a timestamped run directory.
+    def run_dir_for(
+        self, cfg: ExperimentConfig, experiment_id: str = "", model_tag: str = "model"
+    ) -> Path:
+        """Return the canonical run directory for a (config, experiment, model).
 
-        Path layout:
-            results/{group}/{experiment_id}/{cfg.name}/{YYYYMMDD_HHMMSS}/   (when experiment_id set)
-            results/{group}/{cfg.name}/{YYYYMMDD_HHMMSS}/                   (legacy / no experiment_id)
+        Path layout (model_tag leaf — stable, traceable, overwritten on re-run):
+            results/{group}/{experiment_id}/{cfg.name}/{model_tag}/   (when experiment_id set)
+            results/{group}/{cfg.name}/{model_tag}/                   (no experiment_id)
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        tag = model_tag or "model"
         if experiment_id:
-            run_dir = self.results_root / cfg.group / experiment_id / cfg.name / timestamp
-        else:
-            run_dir = self.results_root / cfg.group / cfg.name / timestamp
+            return self.results_root / cfg.group / experiment_id / cfg.name / tag
+        return self.results_root / cfg.group / cfg.name / tag
+
+    def make_run_dir(
+        self,
+        cfg: ExperimentConfig,
+        experiment_id: str = "",
+        model_tag: str = "model",
+        model_path: str = "",
+    ) -> Path:
+        """Create and return the canonical run directory for this model.
+
+        Same (config, experiment_id, model_tag) → same directory; a new run
+        overwrites the previous one in place. Writes run_meta.json recording the
+        real model_path so every run is traceable to the model that produced it.
+        """
+        run_dir = self.run_dir_for(cfg, experiment_id, model_tag)
         run_dir.mkdir(parents=True, exist_ok=True)
 
         snapshot_path = run_dir / "config_snapshot.yaml"
@@ -49,27 +82,32 @@ class ExperimentRegistry:
         if experiment_id:
             (run_dir / "experiment_id.txt").write_text(experiment_id)
 
+        run_meta = {
+            "model_path": model_path,
+            "model_tag": model_tag,
+            "config_name": cfg.name,
+            "group": cfg.group,
+            "experiment_id": experiment_id,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        }
+        (run_dir / "run_meta.json").write_text(json.dumps(run_meta, indent=2))
+
         return run_dir
 
-    def is_completed(self, cfg: ExperimentConfig, experiment_id: str = "") -> Optional[Path]:
+    def is_completed(
+        self, cfg: ExperimentConfig, experiment_id: str = "", model_tag: str = "model"
+    ) -> Optional[Path]:
         """
-        Check if an identical config has already been run successfully.
-        Returns the most recent matching run_dir, or None.
+        Check if this exact (config, experiment, model) already completed successfully.
+        Returns the run_dir if config hash matches and metrics.json exists, else None.
         """
         cfg_hash = _config_hash(cfg)
-        if experiment_id:
-            group_dir = self.results_root / cfg.group / experiment_id / cfg.name
-        else:
-            group_dir = self.results_root / cfg.group / cfg.name
-        if not group_dir.exists():
-            return None
-
-        for run_dir in sorted(group_dir.iterdir(), reverse=True):
-            hash_file = run_dir / "config_hash.txt"
-            metrics_file = run_dir / "metrics.json"
-            if hash_file.exists() and metrics_file.exists():
-                if hash_file.read_text().strip() == cfg_hash:
-                    return run_dir
+        run_dir = self.run_dir_for(cfg, experiment_id, model_tag)
+        hash_file = run_dir / "config_hash.txt"
+        metrics_file = run_dir / "metrics.json"
+        if hash_file.exists() and metrics_file.exists():
+            if hash_file.read_text().strip() == cfg_hash:
+                return run_dir
         return None
 
     def find_runs(
@@ -97,13 +135,22 @@ class ExperimentRegistry:
                 if tags and not all(t in run_tags for t in tags):
                     continue
 
+                meta_path = run_dir / "run_meta.json"
+                meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+                # timestamp now lives in run_meta (dir leaf is model_tag, not a timestamp)
+                timestamp = meta.get("timestamp") or datetime.fromtimestamp(
+                    metrics_path.stat().st_mtime
+                ).strftime("%Y%m%d_%H%M%S")
+
                 runs.append({
                     "run_dir": str(run_dir),
                     "name": cfg_data.get("name", run_dir.parent.name),
-                    "group": cfg_data.get("group", run_dir.parent.parent.name),
+                    "group": cfg_data.get("group"),
                     "tags": run_tags,
                     "metrics": metrics,
-                    "timestamp": run_dir.name,
+                    "timestamp": timestamp,
+                    "model_tag": meta.get("model_tag", run_dir.name),
+                    "model_path": meta.get("model_path", ""),
                 })
             except Exception:
                 continue

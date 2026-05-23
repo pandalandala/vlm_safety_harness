@@ -21,12 +21,12 @@ tier_a_base:
 tier_b:
   - main_baseline_kimi_vl_a3b.yaml
   - main_baseline_minicpm_o_4_5.yaml
-  - main_baseline_minicpm_v_4_6.yaml
   - main_baseline_gemma_4_e4b.yaml
   - main_baseline_glm_4_6v_flash.yaml
   - main_baseline_qwen3_5_4b.yaml
   - main_baseline_internvl3_5_4b.yaml
   - main_baseline_llava_ov_1_5_4b.yaml
+  - main_baseline_deepseek_vl2_tiny.yaml
 
 tier_c_closed_source:
   # No harness configs; driven by scripts/run_closed_source.py

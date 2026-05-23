@@ -1,0 +1,8 @@
+{
+  "model_path": "OpenGVLab/InternVL3_5-8B-HF",
+  "model_tag": "InternVL3_5-8B-HF",
+  "config_name": "A4_counterfactual",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260523_163226"
+}

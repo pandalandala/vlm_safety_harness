@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from harness.utils.env import load_project_env
 from harness.utils.logger import init_session
 
 MIS_TEST_ROOT = Path("/mnt/hdd/xuran/vlm_safety_harness/data_links/mis_test")
@@ -36,18 +37,38 @@ A_EXPERIMENT_CONFIGS = {
     "A4": "prelim/A4_counterfactual.yaml",
 }
 
-# Known model HF IDs → (short_name, architecture, size_b, trust_remote_code)
+# Known model aliases → (short_name, architecture, size_b, trust_remote_code[, resolved_model_path])
 MODEL_INFO: dict[str, tuple] = {
     # Base VLMs (no safety SFT)
     "OpenGVLab/InternVL2_5-8B":                      ("internvl2_5_8b",       "internvl",  8.0, True),
-    "OpenGVLab/InternVL3_5-8B":                      ("internvl3_5_8b",       "internvl",  8.5, True),
+    "OpenGVLab/InternVL3_5-8B":                      (
+        "internvl3_5_8b",
+        "internvl",
+        8.5,
+        True,
+        "OpenGVLab/InternVL3_5-8B-HF",
+    ),
     "Qwen/Qwen3.5-9B":                               ("qwen3_5_9b",           "qwen2vl",   9.0, False),
-    "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct":     ("llava_ov_8b",          "llava",     8.0, False),
+    # Use the local HF-compatible export for inference. The raw Hub checkpoint
+    # keeps legacy key prefixes that do not match the current 1.5 remote code.
+    "lmms-lab/LLaVA-OneVision-1.5-8B-Instruct":     (
+        "llava_ov_8b",
+        "llava_ov_1_5",
+        8.0,
+        True,
+        "/mnt/hdd/xuran/vlm_safety_harness/models/llava_ov_1_5_8b_base_hfcompat",
+    ),
     # Our MIRage-data SFT models (trained on mis_train.json; canonical checkpoints under models/)
     # Usage: --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
     "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5": ("mirage_data_internvl3_5", "internvl", 8.5, True),
     "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5":     ("mirage_data_qwen3_5",     "qwen2vl",  9.0, False),
-    "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov":    ("mirage_data_llava_ov",    "llava",    8.0, False),
+    "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov":    (
+        "mirage_data_llava_ov",
+        "llava_ov_1_5",
+        8.0,
+        True,
+        "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov_hfcompat",
+    ),
     # Tuwhy public checkpoints — A experiment diagnosis ONLY (banned from main experiments)
     # Only use to diagnose original MIRage defects in prelim/A experiments.
     "Tuwhy/InternVL2.5-8B-MIRage":                  ("internvl2_5_8b_mirage","internvl",  8.0, True),
@@ -87,6 +108,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output", default=None,
                    help="Override probe output path when building probes")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--cuda-visible-devices", default=None, metavar="IDS",
+                   help="GPU IDs to expose (e.g. '0' or '0,1,2,3'); passed through to run_experiment.py")
     return p.parse_args()
 
 
@@ -137,7 +160,9 @@ def build_probes(
 def _model_overrides(hf_id: str, arch: str | None, size_b: float | None) -> list[str]:
     """Build --override list for run_experiment.py from model HF ID."""
     if hf_id in MODEL_INFO:
-        name, architecture, sz, trc = MODEL_INFO[hf_id]
+        info = MODEL_INFO[hf_id]
+        name, architecture, sz, trc = info[:4]
+        resolved_model_path = info[4] if len(info) >= 5 else hf_id
     else:
         # Unknown path — require explicit --arch / --size-b
         if not arch:
@@ -149,9 +174,10 @@ def _model_overrides(hf_id: str, arch: str | None, size_b: float | None) -> list
         sz = size_b or 8.0
         trc = architecture in ("internvl", "phi", "minicpm")
         name = Path(hf_id).name.lower().replace("-", "_").replace(".", "_")
+        resolved_model_path = hf_id
 
     return [
-        f"model.hf_path={hf_id}",
+        f"model.hf_path={resolved_model_path}",
         f"model.name={name}",
         f"model.architecture={architecture}",
         f"model.size_b={sz}",
@@ -167,7 +193,7 @@ def run_a_experiment(exp_id: str, args: argparse.Namespace) -> None:
         overrides = _model_overrides(hf_id, args.arch, args.size_b)
 
         cmd = [
-            "python", "scripts/run_experiment.py", config,
+            sys.executable, "scripts/run_experiment.py", config,
             "--skip-train",
             "--override", *overrides,
         ]
@@ -177,6 +203,8 @@ def run_a_experiment(exp_id: str, args: argparse.Namespace) -> None:
             cmd += ["--skip-eval"]
         if args.dry_run:
             cmd += ["--dry-run"]
+        if args.cuda_visible_devices is not None:
+            cmd += ["--cuda-visible-devices", args.cuda_visible_devices]
 
         print(f"\n{'='*60}")
         print(f"[{exp_id}] model={hf_id}")
@@ -190,6 +218,7 @@ def run_a_experiment(exp_id: str, args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    load_project_env()
     args = parse_args()
     init_session("run_prelim", tag=args.experiment, category="prelim")
 

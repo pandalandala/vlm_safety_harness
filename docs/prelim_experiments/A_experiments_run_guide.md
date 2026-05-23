@@ -68,6 +68,55 @@ python scripts/run_prelim.py --build-probes
 - `results/prelim/probes/mis_hard_relation_annotated.json` (A2 占位)
 - `results/prelim/probes/relation_type_probe.json`     (A2 合并占位)
 
+### Step 0b：构建 extra_relation_probe（A2 DREAMS 关系分类）
+
+**首次运行**（实时 API，扫前 5000）：
+```bash
+export OPENAI_API_KEY="sk-..."
+conda activate mis_safety
+python scripts/build_a2_dreams_probe.py \
+  --min-per-type 50 \
+  --max-candidates 5000 \
+  --model gpt-4o
+```
+
+**续扫剩余 12022 条**（已扫前 5000，需从 rank 5001 继续）：
+```bash
+export OPENAI_API_KEY="sk-..."
+conda activate mis_safety
+
+# 实时模式（快，pay per token）
+python scripts/build_a2_dreams_probe.py \
+  --resume \
+  --skip-n 5000 \
+  --max-candidates 12022 \
+  --min-per-type 50 \
+  --model gpt-4o
+
+# Batch API 模式（慢，最长 24h，省 50% 费用）
+python scripts/build_a2_dreams_probe.py \
+  --resume \
+  --skip-n 5000 \
+  --max-candidates 12022 \
+  --min-per-type 50 \
+  --model gpt-4o \
+  --use-batch \
+  --batch-poll-interval 120
+```
+
+**参数说明**：
+| 参数 | 说明 |
+|------|------|
+| `--resume` | 读取现有输出文件，跳过已有 ID，append 新结果 |
+| `--skip-n N` | 跳过排序后前 N 条候选（避免重扫已处理样本） |
+| `--max-candidates N` | 从 skip-n 之后最多扫 N 条 |
+| `--use-batch` | 启用 OpenAI Batch API（异步，50% 折扣） |
+| `--batch-poll-interval N` | Batch 轮询间隔秒数（默认 60） |
+| `--model MODEL` | OpenAI 模型，默认 `gpt-4o` |
+| `--concurrency N` | 实时模式并发数，默认 20 |
+
+输出：`results/prelim/probes/extra_relation_probe.jsonl`
+
 ---
 
 ## Step 1：A3 Synthetic-Real Gap

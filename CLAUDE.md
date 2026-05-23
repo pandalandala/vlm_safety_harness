@@ -34,13 +34,21 @@ MIS 缺陷详见: `.claude/docs/MIS_shortcomes_final.md`
 - 推理输出：JSONL `{id, question, response, image_path1, image_path2, category}`
 - 评测输出：JSONL `{id, ..., label_perception, label_str}`（与 `MIS gpt_eval.py` 格式一致）
 
-## 实验命名规范
+## 实验命名规范（model_tag 布局，2026-05 重构）
 
-- A 实验：`results/prelim/A{1-4}/{cfg.name}/{YYYYMMDD_HHMMSS}/`
-- 主实验：`results/main/E{1-4}/{cfg.name}/{YYYYMMDD_HHMMSS}/`
-- 消融：`results/ablation/abl_{变量}/{YYYYMMDD_HHMMSS}/`
-- `--experiment-id` 参数控制路径中的实验号（E1/E2/E3/E4/A1 等）
-- 同一 config 跑不同实验（如 E1 vs E2 vs E3）结果自动落在不同子目录
+- 主实验：`results/main/E{1-4}/{cfg.name}/{model_tag}/`
+- A 实验：`results/prelim/A{1-4}/{cfg.name}/{model_tag}/`
+- 消融：`results/ablation/abl_{变量}/{cfg.name}/{model_tag}/`
+- **leaf 是 model_tag 不是时间戳**：同一 config 的 base / SFT / 不同 checkpoint 落在不同
+  model_tag 目录，互不混淆、可溯源；同 (config, model) 重跑**原地覆盖**。
+- `model_tag` 派生（`harness.config.registry.model_tag_from`）：model_path/HF id 的 basename
+  （sanitized）；训练 run 用 `cfg.model.name`。例：`--model-path .../models/dreams_internvl3_5`
+  → `dreams_internvl3_5`；`OpenGVLab/InternVL3_5-8B-HF` → `InternVL3_5-8B-HF`。
+- 每个 run 写 `run_meta.json`（记录真实 `model_path` + timestamp），产物可溯源到具体模型。
+- `--experiment-id` 控制路径中的实验号（E1/E2/E3/E4/A1 等）；同 config 跑不同实验自动分目录。
+- 评分：`run_eval_only.py --experiment-id E1 --config {cfg} --model-tag {tag}` 自动定位
+  `results/{group}/{eid}/{cfg}/{tag}/responses/`，无需 `ls -td` 猜测。
+- 设计文档：`docs/run_traceability_plan.md`；迁移脚本：`scripts/migrate_run_layout.py`。
 
 ## A 实验约束
 

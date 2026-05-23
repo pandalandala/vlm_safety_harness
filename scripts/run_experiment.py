@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from harness.config.loader import ConfigLoader
-from harness.config.registry import ExperimentRegistry
+from harness.config.registry import ExperimentRegistry, model_tag_from
 from harness.config.schema import ExperimentConfig
 from harness.data.converters import save_llamafactory_dataset
 from harness.data.dataset import HarnessDataset
@@ -26,6 +26,7 @@ from harness.evaluation import get_evaluator
 from harness.gpu.allocator import GPUAllocator
 from harness.inference.engine import BENCHMARK_REGISTRY, InferenceEngine
 from harness.training.trainer import HarnessTrainer
+from harness.utils.env import load_project_env
 from harness.utils.logger import init_session
 
 
@@ -136,6 +137,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    load_project_env()
     args = parse_args()
     init_session("run_experiment", tag=args.config, category="main")
 
@@ -147,24 +149,32 @@ def main() -> None:
     registry = ExperimentRegistry()
     exp_id = args.experiment_id  # e.g. "E1", "E2", "A1", ""
 
-    # Check if already completed
+    # Resolve which model this run uses BEFORE choosing the run directory, so the
+    # run lands in a model-specific, traceable dir (base vs SFT never collide).
+    skip_train = args.skip_train or args.model_path or not cfg.training.enabled
+    model_path = args.model_path or cfg.model.hf_path
+    # Inference-only run → tag from the actual model path/HF id.
+    # Training run → tag from cfg.model.name (the SFT output of this config).
+    model_tag = model_tag_from(model_path if skip_train else cfg.model.name)
+
+    # Check if this exact (config, experiment, model) already completed
     if not args.force:
-        existing = registry.is_completed(cfg, experiment_id=exp_id)
+        existing = registry.is_completed(cfg, experiment_id=exp_id, model_tag=model_tag)
         if existing:
             print(f"[skip] Already completed: {existing}")
             print("Use --force to re-run.")
             return
 
-    run_dir = registry.make_run_dir(cfg, experiment_id=exp_id)
-    print(f"[run] {cfg.name} → {run_dir}")
+    run_dir = registry.make_run_dir(
+        cfg, experiment_id=exp_id, model_tag=model_tag, model_path=model_path
+    )
+    print(f"[run] {cfg.name} [{model_tag}] → {run_dir}")
 
     # GPU allocation
     allocator = GPUAllocator()
     print(allocator.status_report())
 
     # ── Training ──────────────────────────────────────────────────────────
-    skip_train = args.skip_train or args.model_path or not cfg.training.enabled
-    model_path = args.model_path or cfg.model.hf_path
 
     if not skip_train:
         if args.resume_latest_train and cfg.training.resume_from_checkpoint is None:
@@ -203,6 +213,13 @@ def main() -> None:
         else:
             train_plan_data = {"train_gpus": 0, "train_gpu_ids": []}
         json.dump(train_plan_data, f)
+
+    # Record the real model used for inference (post-training this is the checkpoint).
+    meta_path = run_dir / "run_meta.json"
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
+        meta["model_path"] = model_path
+        meta_path.write_text(json.dumps(meta, indent=2))
 
     # ── Inference ─────────────────────────────────────────────────────────
     responses_dir = run_dir / "responses"

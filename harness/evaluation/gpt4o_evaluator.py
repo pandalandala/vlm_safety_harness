@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 from .metrics import MetricsDict, compute_metrics
+from ..utils.env import load_project_env, resolve_eval_model
 
 
 # Orthogonal-axis schema: safety judged independently from per-image perception.
@@ -103,7 +104,8 @@ class GPT4oEvaluator:
         max_retries: int = 3,
         retry_delay: float = 2.0,
     ):
-        self.model = model
+        load_project_env()
+        self.model = resolve_eval_model(model)
         self.api_key = os.environ.get(api_key_env)
         if not self.api_key:
             raise EnvironmentError(f"API key not found in env var: {api_key_env}")

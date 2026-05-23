@@ -1,0 +1,8 @@
+{
+  "model_path": "/mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5",
+  "model_tag": "mirage_data_internvl3_5",
+  "config_name": "A3_synthetic_real_gap",
+  "group": "prelim",
+  "experiment_id": "",
+  "timestamp": "20260522_221239"
+}

@@ -24,6 +24,7 @@ from typing import Iterable, Optional
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from harness.utils.env import load_project_env
 from harness.data.benchmarks import (
     AdvBenchBenchmark, FigStepBenchmark, MISBenchmark, MMSafetyBenchmark,
     MSSBenchmark, MMStarBenchmark,
@@ -148,6 +149,7 @@ def dispatch(model_id: str, records: list[dict]) -> list[dict]:
 
 
 def main() -> int:
+    load_project_env()
     args = parse_args()
     if not args.models:
         print("ERROR: --models is required (no defaults).", file=sys.stderr)

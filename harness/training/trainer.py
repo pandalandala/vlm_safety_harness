@@ -34,7 +34,7 @@ ARCH_TO_TEMPLATE = {
     "qwen2vl":       "qwen2_vl",
     "qwen3_vl":      "qwen3_vl",
     "llava":         "llava_next",
-    "llava_ov_1_5":  "qwen2_vl",    # LLaVA-OV-1.5 uses Qwen2-VL vision pipeline; image_token=<|image_pad|>
+    "llava_ov_1_5":  "qwen2_vl",  # LLaVA-OV-1.5 uses Qwen2-VL vision pipeline + ChatML format (native chat_template: <|im_start|>, <|vision_start|><|image_pad|><|vision_end|>)
     "kimi_vl":       "kimi_vl",
     "minicpm":       "minicpm_v",
     "minicpm_v_4_6": "minicpm_v_4_6",

@@ -117,7 +117,7 @@ Section 6: 消融实验分析关键设计决策
 - [x] **生成训练集响应标注**（一次性，需要 Qwen3.5-122B 或等价大模型）
 
 ```bash
-conda activate mis_safety && python scripts/generate_responses.py --input /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume
+conda activate mis_safety && python scripts/generate_responses.py --input /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume --gpu-ids 0,1,2,3
 ```
 
 > **[归档保留 / 当前不运行]** 构建 E5 反事实对（需要 benign image 目录）；E5 counterfactual consistency 暂时取消，以下命令仅保留给未来恢复实验时参考：
@@ -169,40 +169,40 @@ conda activate mis_safety && python scripts/run_prelim.py --build-probes --build
 
 > A1 config 已同时包含 original-image 与 black-frame benchmark。
 
-- [ ] **InternVL3.5-8B base — A1 推理**
+- [x] **InternVL3.5-8B base — A1 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models OpenGVLab/InternVL3_5-8B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models OpenGVLab/InternVL3_5-8B --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5-9B base — A1 推理**
+- [x] **Qwen3.5-9B base — A1 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models Qwen/Qwen3.5-9B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models Qwen/Qwen3.5-9B --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV-1.5-8B base — A1 推理**
+- [ ] **LLaVA-OV-1.5-8B base — A1 推理** （0）
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A1 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A1 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct --cuda-visible-devices 0
 ```
 
-- [ ] **InternVL3.5 + MIRage-data — A1 推理**
+- [x] **InternVL3.5 + MIRage-data — A1 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5 --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5 + MIRage-data — A1 推理**
+- [x] **Qwen3.5 + MIRage-data — A1 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5 --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV + MIRage-data — A1 推理**
+- [ ] **LLaVA-OV + MIRage-data — A1 推理** （1）
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A1 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov --cuda-visible-devices 0
 ```
 
 **Step 2 — 评分（全部 A1 responses 就绪后，调 GPT-4o API）**:
@@ -223,67 +223,75 @@ done
 
 ### 5.2 A2 — 关系类型覆盖诊断 (Relation Pattern Coverage)
 
-**核心问题**: MIS 危害样本 90%+ 遵循 tool→target 单一模式，MIRage 对非标准关系类型无安全能力。
+**核心问题**: MIS 数据集关系模式单一，MIRage 对非 tool→target 关系类型无安全能力。
 
 **设计**:
-1. GPT-4o 标注 MIS-hard 510 条的关系类型分布。
-2. 构建 4 类关系 Probe（每类 ~50 条），测量各类 ASR。
+1. 实地核查 MIS-hard 510 条样本的关系类型：经逐条检查，全部 510 条均为 `tool_target` 模式（图1=工具/手段，图2=目标）。MIS 构造管线的句式模板决定了这一结构性限制（见 `docs/.claude/MIS_shortcomes_final.md` §三）。
+2. 为覆盖另外三种关系类型，从 DREAMS 数据集中用 GPT-4o 筛选样本：遍历 DREAMS `scored.json`（按 vlm_score 降序），分类每条样本的图像关系类型，直到 `before_after` / `identity_linking` / `context_shift` 各≥50 条。
+3. 最终 Probe = MIS-hard 前50条（`tool_target`）+ DREAMS 筛选样本（三类各≥50条），共≥200条。
 
 **对应表格** (Table 4 / Figure in Section 4.2):
 
-| 关系类型 | MIS-hard 占比 | Base ASR | MIRage-data SFT ASR (3 模型均值) |
-|---------|-------------|----------|--------------------------------|
-| tool→target | ~90% | ~85% | ~3% |
-| before→after | ~4% | ~80% | ~50% ← gap |
-| identity-linking | ~3% | ~80% | ~45% ← gap |
-| context-shift | ~3% | ~80% | ~40% ← gap |
+| 关系类型 | Probe 样本来源 | 样本数 | Base ASR (预期) | MIRage-data SFT ASR (预期) |
+|---------|-------------|-------|----------------|--------------------------|
+| tool→target | MIS-hard 前50条 | 50 | ~85% | ~3% |
+| before→after | DREAMS（GPT-4o筛选）| ≥50 | ~80% | ~50% ← gap |
+| identity-linking | DREAMS（GPT-4o筛选）| ≥50 | ~80% | ~45% ← gap |
+| context-shift | DREAMS（GPT-4o筛选）| ≥50 | ~80% | ~40% ← gap |
 
-**命令 — 关系类型标注（一次性）**:
+**命令 — Probe 构建（一次性，两步）**:
 
-- [ ] **GPT-4o 关系类型标注 + relation probe**（一次性；默认写入 results/prelim/probes/）
+- [x] **Step 1：从 DREAMS 筛选非 tool_target 样本**（写入 results/prelim/probes/extra_relation_probe.jsonl）
+
+```bash
+conda activate mis_safety &&  python scripts/build_a2_dreams_probe.py --resume --skip-n 5000 --max-candidates 12022 --min-per-type 50 --model gpt-5.4-nano-2026-03-17 --use-batch --batch-max-bytes 52428800
+
+```
+
+> `build_a2_dreams_probe.py` 遍历 DREAMS scored.json（默认最多5000条），每条调 GPT-4o 分类关系类型，三类各满50条后自动停止。需要 `OPENAI_API_KEY` 环境变量。dry-run 验证：`python scripts/build_a2_dreams_probe.py --dry-run --max-candidates 5`
+
+- [ ] **Step 2：合并 MIS-hard + DREAMS，重建 relation_type_probe.json**
 
 ```bash
 conda activate mis_safety && python scripts/run_prelim.py --build-probes --build-probes-experiment A2
 ```
-
-> A2 的 relation probe 与关系类型标注由同一个 `--build-probes --build-probes-experiment A2` 命令同时生成，不需要再单独跑一遍。
 
 **命令 — 推理（按模型逐条运行）**:
 
 - [ ] **InternVL3.5-8B base — A2 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models OpenGVLab/InternVL3_5-8B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models OpenGVLab/InternVL3_5-8B --cuda-visible-devices 0
 ```
 
 - [ ] **Qwen3.5-9B base — A2 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models Qwen/Qwen3.5-9B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models Qwen/Qwen3.5-9B --cuda-visible-devices 0
 ```
 
 - [ ] **LLaVA-OV-1.5-8B base — A2 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A2 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A2 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct --cuda-visible-devices 0
 ```
 
 - [ ] **InternVL3.5 + MIRage-data — A2 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5 --cuda-visible-devices 0
 ```
 
 - [ ] **Qwen3.5 + MIRage-data — A2 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5 --cuda-visible-devices 0
 ```
 
 - [ ] **LLaVA-OV + MIRage-data — A2 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A2 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov --cuda-visible-devices 0
 ```
 
 ---
@@ -314,40 +322,40 @@ Synth-Real Gap = ASR_real - ASR_easy
 
 > A3 config 已包含 mis_easy / mis_hard / mis_real，一次 run 覆盖全部三个 split。
 
-- [ ] **InternVL3.5-8B base — A3 推理**
+- [x] **InternVL3.5-8B base — A3 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models OpenGVLab/InternVL3_5-8B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models OpenGVLab/InternVL3_5-8B --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5-9B base — A3 推理**
+- [x] **Qwen3.5-9B base — A3 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models Qwen/Qwen3.5-9B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models Qwen/Qwen3.5-9B --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV-1.5-8B base — A3 推理**
+- [ ] **LLaVA-OV-1.5-8B base — A3 推理**（2）
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A3 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A3 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct --cuda-visible-devices 0
 ```
 
-- [ ] **InternVL3.5 + MIRage-data — A3 推理**
+- [x] **InternVL3.5 + MIRage-data — A3 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5 --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5 + MIRage-data — A3 推理**
+- [x] **Qwen3.5 + MIRage-data — A3 推理**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5 --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV + MIRage-data — A3 推理**
+- [ ] **LLaVA-OV + MIRage-data — A3 推理**（3）
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A3 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov --cuda-visible-devices 0
 ```
 
 ---
@@ -374,40 +382,40 @@ conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A3 
 
 > A4 config 已包含 mssbench_safe / mssbench_unsafe / mis_hard，一次 run 覆盖全部三个 split。
 
-- [ ] **InternVL3.5-8B base — A4 推理**
+- [ ] **InternVL3.5-8B base — A4 推理**（4）
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models OpenGVLab/InternVL3_5-8B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models OpenGVLab/InternVL3_5-8B --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5-9B base — A4 推理**
+- [ ] **Qwen3.5-9B base — A4 推理**（5）
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models Qwen/Qwen3.5-9B
+conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models Qwen/Qwen3.5-9B --cuda-visible-devices 0
 ```
 
 - [ ] **LLaVA-OV-1.5-8B base — A4 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A4 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A4 --skip-eval --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct --cuda-visible-devices 0
 ```
 
-- [ ] **InternVL3.5 + MIRage-data — A4 推理**
+- [ ] **InternVL3.5 + MIRage-data — A4 推理**（6）
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_internvl3_5 --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5 + MIRage-data — A4 推理**
+- [ ] **Qwen3.5 + MIRage-data — A4 推理**（7）
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5
+conda activate mis_safety && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_qwen3_5 --cuda-visible-devices 0
 ```
 
 - [ ] **LLaVA-OV + MIRage-data — A4 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment A4 --skip-eval --models /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov --cuda-visible-devices 0
 ```
 
 ---
@@ -441,13 +449,13 @@ conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A4 
 | **— Tier B 7-9B —** | | | | | | | | |
 | Kimi-VL-A3B | | | | | | | | |
 | MiniCPM-o-4.5 | | | | | | | | |
-| MiniCPM-V-4.6 | | | | | | | | |
 | Gemma-4-E4B | | | | | | | | |
 | GLM-4.6V-Flash | | | | | | | | |
 | **— Tier B 4B —** | | | | | | | | |
 | Qwen3.5-4B | | | | | | | | |
 | InternVL3.5-4B | | | | | | | | |
 | LLaVA-OV-1.5-4B | | | | | | | | |
+| DeepSeek-VL2-Tiny | | | | | | | | |
 | **— Tier C 闭源上限 —** | | | | | | | | |
 | GPT-5.5 | | | | | | | | |
 | Gemini-3.1-Pro | | | | | | | | |
@@ -480,19 +488,22 @@ conda activate mis_safety_llava && python scripts/run_prelim.py --experiment A4 
 - [x] **InternVL3.5-8B + DREAMS SFT**（训练 + 推理；GPT 评测由 78server 单独跑）
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 - [x] **Qwen3.5-9B + DREAMS SFT**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
-- [x] **LLaVA-OV-1.5-8B + DREAMS SFT**
+- [x] **LLaVA-OV-1.5-8B + DREAMS SFT**（仅训练；推理必须单独在 `mis_safety_llava453` 跑）
+
+> LLaVA-OV-1.5 训练需 `mis_safety_llava`（transformers dev），推理需 `mis_safety_llava453`
+> （transformers 4.57.6）。两 env 互斥，故训练命令加 `--skip-inference`，推理见下方 E1 推理小节。
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval --skip-inference --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 **MIRage-data SFT（按架构逐条运行，用于 E2/E3 对比；E5 暂停不纳入当前对比）**:
@@ -500,19 +511,19 @@ conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dr
 - [x] **InternVL3.5-8B + MIRage-data SFT**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 - [x] **Qwen3.5-9B + MIRage-data SFT**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
-- [x] **LLaVA-OV-1.5-8B + MIRage-data SFT**
+- [x] **LLaVA-OV-1.5-8B + MIRage-data SFT**（仅训练；推理单独在 `mis_safety_llava453` 跑）
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval --skip-inference --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 > **⚠️ 训练完成后必须将 checkpoint 放到 `models/` 目录，78server 的 `--skip-train --model-path` 才能正确加载。**  
@@ -526,10 +537,11 @@ ROOT=/mnt/hdd/xuran/vlm_safety_harness
 
 link_latest() {
     local cfg=$1 dst=$2
-    local run target link
-    run=$(ls -td "${ROOT}/results/main/${cfg}/"*/ 2>/dev/null | head -1)
-    [ -z "$run" ] && { echo "[skip] no run found: ${cfg}"; return 1; }
-    target=$(realpath "${run}checkpoint")
+    local target link
+    # New layout: results/main/{cfg}/{model_tag}/checkpoint — pick newest checkpoint by mtime.
+    target=$(ls -td "${ROOT}/results/main/${cfg}/"*/checkpoint 2>/dev/null | head -1)
+    [ -z "$target" ] && { echo "[skip] no checkpoint found: ${cfg}"; return 1; }
+    target=$(realpath "$target")
     link="${ROOT}/models/${dst}"
     if [ -d "$link" ] && [ ! -L "$link" ]; then
         if find "$link" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
@@ -568,7 +580,7 @@ link_latest main_baseline_mirage_data_llava_ov    mirage_data_llava_ov
 > 也仍会产出病态长文本而非正常安全回复；
 > 需要基于本地 `llava_ov_1_5_8b_base_hfcompat` 重新训练后，才值得重新跑本节命令。
 
-- [ ] **InternVL3.5 + DREAMS 推理**
+- [x] **InternVL3.5 + DREAMS 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml \
@@ -577,7 +589,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_i
     --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5 + DREAMS 推理**
+- [x] **Qwen3.5 + DREAMS 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml \
@@ -586,7 +598,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
     --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV + DREAMS 推理**
+- [x] **LLaVA-OV + DREAMS 推理**
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
@@ -601,7 +613,7 @@ conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/dreams_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -609,15 +621,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/dreams_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + DREAMS 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/dreams_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -634,11 +646,11 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 > 该 canonical 路径现已在 `mis_safety_llava453` 下 smoke 通过：无
 > `[INFERENCE_ERROR]`，response 为正常的安全拒答文本。
 > 另外，LLaVA-OV 的 smoke 推理请使用 `mis_safety_llava453`，不要再用
-> `mis_safety_llava` 直接判定 response 质量；后者在 2026-05-19 的对照中
+> `mis_safety_llava453` 直接判定 response 质量；后者在 2026-05-19 的对照中
 > 会让 base 和本地 checkpoint 都出现空字符串、`Question: What is the image?`
 > 等假坏结果。
 
-- [ ] **InternVL3.5 + MIRage-data 推理**
+- [x] **InternVL3.5 + MIRage-data 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml \
@@ -647,7 +659,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5 + MIRage-data 推理**
+- [x] **Qwen3.5 + MIRage-data 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml \
@@ -656,7 +668,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV + MIRage-data 推理**
+- [x] **LLaVA-OV + MIRage-data 推理**
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
@@ -671,7 +683,7 @@ conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_internvl3_5/mirage_data_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -679,15 +691,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_qwen3_5/mirage_data_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + MIRage-data 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_llava_ov/mirage_data_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -699,12 +711,12 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 >
 > **LLaVA base 环境**: 2026-05-19 的 smoke 结果表明，官方
 > `LLaVA-OneVision-1.5-8B/4B-Instruct` 应使用 `mis_safety_llava453`
-> 推理；旧环境 `mis_safety_llava` 会触发更高版本 Transformers / flash-attn
+> 推理；旧环境 `mis_safety_llava453` 会触发更高版本 Transformers / flash-attn
 > 兼容问题。
 
 **Step 1 — Tier A Base 推理**：
 
-- [ ] **InternVL3.5-8B base 推理**
+- [x] **InternVL3.5-8B base 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml \
@@ -713,7 +725,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_i
     --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5-9B base 推理**
+- [x] **Qwen3.5-9B base 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml \
@@ -722,7 +734,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
     --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV-1.5-8B base 推理**
+- [x] **LLaVA-OV-1.5-8B base 推理**
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
@@ -737,7 +749,7 @@ conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/InternVL3_5-8B-HF/responses/ \
     --evaluator-type auto
 ```
 
@@ -745,7 +757,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/Qwen3.5-9B/responses/ \
     --evaluator-type auto
 ```
 
@@ -753,7 +765,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/LLaVA-OneVision-1.5-8B-Instruct/responses/ \
     --evaluator-type auto
 ```
 
@@ -765,7 +777,7 @@ conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
 
 **Step 1 — Tier B 推理**：
 
-- [ ] **Kimi-VL-A3B 推理**
+- [x] **Kimi-VL-A3B 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_kimi_vl_a3b.yaml \
@@ -773,7 +785,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **MiniCPM-o-4.5 推理**
+- [x] **MiniCPM-o-4.5 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_minicpm_o_4_5.yaml \
@@ -781,15 +793,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **MiniCPM-V-4.6 推理**
-
-```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_minicpm_v_4_6.yaml \
-    --experiment-id E1 --skip-train --skip-eval \
-    --cuda-visible-devices 0
-```
-
-- [ ] **Gemma-4-E4B 推理**
+- [x] **Gemma-4-E4B 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_gemma_4_e4b.yaml \
@@ -797,7 +801,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **GLM-4.6V-Flash 推理**
+- [x] **GLM-4.6V-Flash 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_glm_4_6v_flash.yaml \
@@ -805,7 +809,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **Qwen3.5-4B 推理**
+- [x] **Qwen3.5-4B 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_qwen3_5_4b.yaml \
@@ -813,7 +817,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **InternVL3.5-4B 推理**
+- [x] **InternVL3.5-4B 推理**
 
 ```bash
 conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_internvl3_5_4b.yaml \
@@ -821,10 +825,18 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
     --cuda-visible-devices 0
 ```
 
-- [ ] **LLaVA-OV-1.5-4B 推理**
+- [x] **LLaVA-OV-1.5-4B 推理**
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_llava_ov_1_5_4b.yaml \
+    --experiment-id E1 --skip-train --skip-eval \
+    --cuda-visible-devices 0
+```
+
+- [x] **DeepSeek-VL2-Tiny 推理**（原生 vLLM，无需训练）
+
+```bash
+conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_deepseek_vl2_tiny.yaml \
     --experiment-id E1 --skip-train --skip-eval \
     --cuda-visible-devices 0
 ```
@@ -835,7 +847,7 @@ conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_kimi_vl_a3b/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_kimi_vl_a3b/Kimi-VL-A3B-Instruct/responses/ \
     --evaluator-type auto
 ```
 
@@ -843,15 +855,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_minicpm_o_4_5/*/ | head -1)responses/" \
-    --evaluator-type auto
-```
-
-- [ ] **MiniCPM-V-4.6 评分**
-
-```bash
-conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_minicpm_v_4_6/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_minicpm_o_4_5/MiniCPM-o-4_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -859,7 +863,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_gemma_4_e4b/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_gemma_4_e4b/gemma-4-E4B-it/responses/ \
     --evaluator-type auto
 ```
 
@@ -867,7 +871,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_glm_4_6v_flash/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_glm_4_6v_flash/GLM-4.6V-Flash/responses/ \
     --evaluator-type auto
 ```
 
@@ -875,7 +879,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_qwen3_5_4b/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_qwen3_5_4b/Qwen3.5-4B/responses/ \
     --evaluator-type auto
 ```
 
@@ -883,7 +887,7 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_internvl3_5_4b/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_internvl3_5_4b/InternVL3_5-4B-HF/responses/ \
     --evaluator-type auto
 ```
 
@@ -891,7 +895,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_llava_ov_1_5_4b/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_llava_ov_1_5_4b/LLaVA-OneVision-1.5-4B-Instruct/responses/ \
+    --evaluator-type auto
+```
+
+- [ ] **DeepSeek-VL2-Tiny 评分**
+
+```bash
+conda activate mis_safety && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_deepseek_vl2_tiny/deepseek-vl2-tiny/responses/ \
     --evaluator-type auto
 ```
 
@@ -924,13 +936,13 @@ conda activate mis_safety && python scripts/run_closed_source.py --models claude
 - [ ] **Tier A DREAMS + E1 完整队列**
 
 ```bash
-conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_dreams
+conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_dreams --cuda-visible-devices 0
 ```
 
 - [ ] **全队列（含 Tier B）**
 
 ```bash
-conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_dreams,tier_a_mirage_data,tier_a_base,tier_b
+conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_dreams,tier_a_mirage_data,tier_a_base,tier_b --cuda-visible-devices 0
 ```
 
 ---
@@ -960,13 +972,13 @@ conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --coh
 - [ ] **E2 全队列切片重算**（E2 不需要重新推理，重用 E1 输出；orchestrator 只做 metric 切片）
 
 ```bash
-conda activate mis_safety && python scripts/run_main.py --experiment-id E2 --cohort tier_a_dreams,tier_a_mirage_data,tier_a_base,tier_b --skip-train
+conda activate mis_safety && python scripts/run_main.py --experiment-id E2 --cohort tier_a_dreams,tier_a_mirage_data,tier_a_base,tier_b --skip-train --cuda-visible-devices 0
 ```
 
-- [ ] **E2 单模型切片重算**（示例 InternVL3.5 DREAMS；自动找最新 run）
+- [ ] **E2 单模型切片重算**（示例 InternVL3.5 DREAMS；确定性 model_tag 路径）
 
 ```bash
-RESP=$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/*/ 2>/dev/null | head -1)
+RESP=/mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/dreams_internvl3_5/
 conda activate mis_safety && python scripts/run_eval_only.py \
     --responses "${RESP}responses/" \
     --output-dir "${RESP}eval_results" \
@@ -1018,7 +1030,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
 - [ ] **LLaVA-OV + DREAMS — AdvBench 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval --benchmarks advbench \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov \
     --cuda-visible-devices 0
@@ -1045,7 +1057,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
 - [ ] **LLaVA-OV + MIRage-data — AdvBench 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval --benchmarks advbench \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov \
     --cuda-visible-devices 0
@@ -1057,7 +1069,7 @@ conda activate mis_safety_llava && python scripts/run_experiment.py main/main_ba
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/dreams_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1065,15 +1077,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/dreams_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + DREAMS — AdvBench 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/dreams_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1081,7 +1093,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/mirage_data_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1089,15 +1101,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/mirage_data_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + MIRage-data — AdvBench 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/mirage_data_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1124,7 +1136,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
 - [ ] **LLaVA-OV + DREAMS — MM-Safety 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval --benchmarks mm_safety \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov \
     --cuda-visible-devices 0
@@ -1151,7 +1163,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
 - [ ] **LLaVA-OV + MIRage-data — MM-Safety 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval --benchmarks mm_safety \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov \
     --cuda-visible-devices 0
@@ -1163,7 +1175,7 @@ conda activate mis_safety_llava && python scripts/run_experiment.py main/main_ba
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/dreams_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1171,15 +1183,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/dreams_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + DREAMS — MM-Safety 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/dreams_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1187,7 +1199,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/mirage_data_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1195,19 +1207,19 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/mirage_data_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + MIRage-data — MM-Safety 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/mirage_data_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
-> ⚠️ **注意**：每个 benchmark 会创建独立的时间戳目录。`ls -td | head -1` 取最新一次推理结果，因此每组 benchmark 推理结束后应立即运行对应的 Step 2 评分命令，避免被后续推理结果覆盖。
+> ⚠️ **注意**：E3 每个模型的 responses 落在确定性目录 `results/main/E3/{config}/{model_tag}/responses/`，同一 (config, model) 重跑会原地覆盖。不同 benchmark 写入同一 responses 目录下不同 `{benchmark}.jsonl`，互不干扰；评分命令直接指向该确定性目录即可，无需 `ls -td` 猜测。
 
 **全部 E3 benchmarks 批量运行（推荐，一次跑完全部7个benchmark）**：
 
@@ -1215,7 +1227,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_main.py --experiment-id E3 --cohort tier_a_dreams,tier_a_mirage_data,tier_b \
-    --skip-eval
+    --skip-eval --cuda-visible-devices 0
 ```
 
 **Tier C 闭源推理命令（当前仅支持 `our_test / mis_easy / mis_hard / mis_real`）**:
@@ -1274,31 +1286,31 @@ conda activate mis_safety && python scripts/run_closed_source.py --models claude
 - [ ] **V0: base（仅推理，无训练）**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0
 ```
 
 - [ ] **V1: InternVL3.5 + MIRage-data**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V1 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V1 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **V3: InternVL3.5 + DREAMS**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V3 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V3 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **V2: InternVL3.5 + MIRage-data + 500 M4-Instruct**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V2 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V2 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **V4: InternVL3.5 + DREAMS + M4-Instruct at 11% final-data ratio**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V4 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V4 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **下载 M4-Instruct 通用数据源**（V2/V4 依赖，若本地未就绪）
@@ -1312,25 +1324,25 @@ conda activate mis_safety && huggingface-cli download lmms-lab/M4-Instruct --rep
 - [ ] **V0 — 仅 MMStar**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar
+conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar --cuda-visible-devices 0
 ```
 
 - [ ] **V0 — 仅 MuirBench**（最关键，DREAMS 是多图数据）
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks muirbench
+conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks muirbench --cuda-visible-devices 0
 ```
 
 - [ ] **V3 — 仅 MuirBench**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V3 --baseline internvl3_5 --benchmarks muirbench
+conda activate mis_safety && python scripts/run_capability.py --variants V3 --baseline internvl3_5 --benchmarks muirbench --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **V1 — 仅 MuirBench**（对比 V3）
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V1 --baseline internvl3_5 --benchmarks muirbench
+conda activate mis_safety && python scripts/run_capability.py --variants V1 --baseline internvl3_5 --benchmarks muirbench --cuda-visible-devices 0,1,2,3
 ```
 
 ---
@@ -1380,10 +1392,10 @@ conda activate mis_safety && python scripts/run_capability.py --variants V1 --ba
 # conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_qwen3_5.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
 
 # [归档保留 / 当前不运行] LLaVA-OV + DREAMS — orig 推理
-# conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-train --benchmarks our_test --cuda-visible-devices 0
+# conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-train --benchmarks our_test --cuda-visible-devices 0
 
 # [归档保留 / 当前不运行] LLaVA-OV + DREAMS — CF 推理
-# conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
+# conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
 
 # [归档保留 / 当前不运行] InternVL3.5 + MIRage-data — orig 推理
 # conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_internvl3_5.yaml --skip-train --benchmarks our_test --cuda-visible-devices 0
@@ -1398,10 +1410,10 @@ conda activate mis_safety && python scripts/run_capability.py --variants V1 --ba
 # conda activate mis_safety && python scripts/run_experiment.py main/main_baseline_mirage_data_qwen3_5.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
 
 # [归档保留 / 当前不运行] LLaVA-OV + MIRage-data — orig 推理
-# conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-train --benchmarks our_test --cuda-visible-devices 0
+# conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-train --benchmarks our_test --cuda-visible-devices 0
 
 # [归档保留 / 当前不运行] LLaVA-OV + MIRage-data — CF 推理
-# conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
+# conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-train --benchmarks our_test_cf --cuda-visible-devices 0
 ```
 
 **归档命令 — E5 指标计算（当前不运行；仅保留给未来恢复实验时参考）**:
@@ -1446,19 +1458,19 @@ conda activate mis_safety && python scripts/run_capability.py --variants V1 --ba
 - [ ] **25% 数据**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=3750 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=3750 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **50% 数据**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=7500 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=7500 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **75% 数据**
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=11250 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.max_train_samples=11250 training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 > 100% 数据与 E1 共用 checkpoint，无需重复运行。
@@ -1468,13 +1480,13 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_i
 - [ ] **仅合成图**（filter_img_source_type=synth）
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.filter_img_source_type=synth training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.filter_img_source_type=synth training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 - [ ] **仅真实图**（filter_img_source_type=real）
 
 ```bash
-conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.filter_img_source_type=real training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_internvl3_5.yaml --skip-eval --resume-latest-train --override dataset.filter_img_source_type=real training.save_strategy=steps training.save_steps=100 training.save_total_limit=1 --cuda-visible-devices 0,1,2,3
 ```
 
 > 50/50 混合为默认配置，无需额外运行。
@@ -1536,14 +1548,17 @@ conda activate mis_safety && python scripts/generate_report.py --group main --fo
 |------|-------|--------|---------|-------|
 | Kimi-VL-A3B | `moonshotai/Kimi-VL-A3B-Instruct` | `main_baseline_kimi_vl_a3b.yaml` | `kimi_vl` | ~3B |
 | MiniCPM-o-4.5 | `openbmb/MiniCPM-o-4_5` | `main_baseline_minicpm_o_4_5.yaml` | `minicpm_o` | ~4.5B |
-| MiniCPM-V-4.6 | `openbmb/MiniCPM-V-4_6` | `main_baseline_minicpm_v_4_6.yaml` | `minicpm_v` | ~4.6B |
 | Gemma-4-E4B | `google/gemma-4-E4B-it` | `main_baseline_gemma_4_e4b.yaml` | `gemma4` | ~4B |
 | GLM-4.6V-Flash | `zai-org/GLM-4.6V-Flash` | `main_baseline_glm_4_6v_flash.yaml` | `glm4_5v` | ~9B |
 | Qwen3.5-4B | `Qwen/Qwen3.5-4B` | `main_baseline_qwen3_5_4b.yaml` | `qwen3_vl` | ~4B |
-| InternVL3.5-4B | `OpenGVLab/InternVL3_5-4B` | `main_baseline_internvl3_5_4b.yaml` | `intern_vl` | ~4B |
+| InternVL3.5-4B | `OpenGVLab/InternVL3_5-4B-HF` | `main_baseline_internvl3_5_4b.yaml` | `intern_vl` | ~4B |
 | LLaVA-OV-1.5-4B | `lmms-lab/LLaVA-OneVision-1.5-4B-Instruct` | `main_baseline_llava_ov_1_5_4b.yaml` | `llava_next` | ~4B |
+| DeepSeek-VL2-Tiny | `deepseek-ai/deepseek-vl2-tiny` | `main_baseline_deepseek_vl2_tiny.yaml` | 原生 vLLM（无 LF 模板） | ~3B |
 
-> ⚠️ **已停用**: Phi-4-multimodal / Idefics2-8B / Ovis2.5-9B / DeepSeek-VL2-Tiny — LlamaFactory 暂无对应模板，已从实验计划中移除。
+> **DeepSeek-VL2-Tiny 说明**: 仅推理。LlamaFactory 无对应模板，故走原生 vLLM 后端
+> `harness/inference/deepseek_vl2_native_backend.py`（engine 按 `architecture: deepseek_vl2` 特判）。vLLM 0.18.1 原生支持 `DeepseekVLV2ForCausalLM`。
+>
+> ⚠️ **仍停用**: Phi-4-multimodal / Idefics2-8B / Ovis2.5-9B — LlamaFactory 暂无对应模板，且未接原生后端，从实验计划中移除。
 
 ### 9.3 Tier C — 闭源上限（SDK 调用）
 
@@ -1701,19 +1716,26 @@ D0
 - [ ] **[78server] A1–A4 prelim**
 
 ```bash
-conda activate mis_safety && python scripts/run_prelim.py --experiments A1 A2 A3 A4
+# InternVL + Qwen (mis_safety env)
+conda activate mis_safety && python scripts/run_prelim.py --experiment all \
+    --models OpenGVLab/InternVL3_5-8B Qwen/Qwen3.5-9B \
+    --cuda-visible-devices 0
+# LLaVA-OV-1.5 (mis_safety_llava453 env — different transformers version required)
+conda activate mis_safety_llava453 && python scripts/run_prelim.py --experiment all \
+    --models lmms-lab/LLaVA-OneVision-1.5-8B-Instruct \
+    --cuda-visible-devices 0
 ```
 
 - [ ] **[78server] E1 Tier A base + Tier B baseline 推理**（无 SFT）
 
 ```bash
-conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_base,tier_b
+conda activate mis_safety && python scripts/run_main.py --experiment-id E1 --cohort tier_a_base,tier_b --cuda-visible-devices 0
 ```
 
 - [ ] **[78server] E4 V0 能力基线**
 
 ```bash
-conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+conda activate mis_safety && python scripts/run_capability.py --variants V0 --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0
 ```
 
 - [ ] **[API worker / 78server] Tier C 闭源**
@@ -1728,7 +1750,7 @@ conda activate mis_safety && python scripts/run_closed_source.py --models gpt-5.
 conda activate mis_safety && python scripts/generate_responses.py \
   --input  /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train.json \
   --output /mnt/hdd/xuran/vlm_safety_harness/data_links/our_dataset/train_annotated.json \
-  --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume
+  --backend vllm --model Qwen/Qwen3.5-122B-A10B --resume --gpu-ids 0,1,2,3
 ```
 
 - [ ] **[任意] G0 M4-Instruct 数据下载**（同时启动，慢慢下）
@@ -1760,7 +1782,7 @@ conda activate mis_safety && CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_exp
 - [x] **LLaVA-OV + DREAMS SFT**
 
 ```bash
-conda activate mis_safety_llava && CUDA_VISIBLE_DEVICES=4,5,6,7 python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety_llava && CUDA_VISIBLE_DEVICES=4,5,6,7 python scripts/run_experiment.py main/main_dreams_llava_ov.yaml --skip-eval --skip-inference --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
 ```
 
 MIRage-data SFT × 3 架构（与 DREAMS SFT 并行，若 GPU 充足）：
@@ -1780,7 +1802,7 @@ conda activate mis_safety && CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_exp
 - [x] **LLaVA-OV + MIRage-data SFT**
 
 ```bash
-conda activate mis_safety_llava && CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
+conda activate mis_safety_llava && CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml --skip-eval --skip-inference --resume-latest-train --override training.save_strategy=steps training.save_steps=100 training.save_total_limit=1
 ```
 
 **Wave 2 — SFT checkpoint 同步到 78server 后（可并行）**
@@ -1808,7 +1830,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
 - [ ] **LLaVA-OV + DREAMS 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
     --experiment-id E1 --skip-train --skip-eval \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov \
     --cuda-visible-devices 0
@@ -1835,7 +1857,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
 - [ ] **LLaVA-OV + MIRage-data 推理**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
     --experiment-id E1 --skip-train --skip-eval \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov \
     --cuda-visible-devices 0
@@ -1847,7 +1869,7 @@ conda activate mis_safety_llava && python scripts/run_experiment.py main/main_ba
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_internvl3_5/dreams_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1855,15 +1877,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_qwen3_5/dreams_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + DREAMS 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_dreams_llava_ov/dreams_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1871,7 +1893,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_internvl3_5/mirage_data_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1879,15 +1901,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_qwen3_5/mirage_data_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + MIRage-data 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E1/main_baseline_mirage_data_llava_ov/mirage_data_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1916,7 +1938,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_dreams_q
 - [ ] **LLaVA-OV + DREAMS — 全部 7 个 benchmark**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_dreams_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval \
     --benchmarks advbench safebench figstep mm_safety jailbreakv siuo mss \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/dreams_llava_ov \
@@ -1946,7 +1968,7 @@ conda activate mis_safety && python scripts/run_experiment.py main/main_baseline
 - [ ] **LLaVA-OV + MIRage-data — 全部 7 个 benchmark**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
+conda activate mis_safety_llava453 && python scripts/run_experiment.py main/main_baseline_mirage_data_llava_ov.yaml \
     --experiment-id E3 --skip-train --skip-eval \
     --benchmarks advbench safebench figstep mm_safety jailbreakv siuo mss \
     --model-path /mnt/hdd/xuran/vlm_safety_harness/models/mirage_data_llava_ov \
@@ -1959,7 +1981,7 @@ conda activate mis_safety_llava && python scripts/run_experiment.py main/main_ba
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_internvl3_5/dreams_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1967,15 +1989,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_qwen3_5/dreams_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + DREAMS 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_dreams_llava_ov/dreams_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -1983,7 +2005,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_internvl3_5/mirage_data_internvl3_5/responses/ \
     --evaluator-type auto
 ```
 
@@ -1991,15 +2013,15 @@ conda activate mis_safety && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/*/ | head -1)responses/" \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_qwen3_5/mirage_data_qwen3_5/responses/ \
     --evaluator-type auto
 ```
 
 - [ ] **LLaVA-OV + MIRage-data 评分**
 
 ```bash
-conda activate mis_safety_llava && python scripts/run_eval_only.py \
-    --responses "$(ls -td /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/*/ | head -1)responses/" \
+conda activate mis_safety_llava453 && python scripts/run_eval_only.py \
+    --responses /mnt/hdd/xuran/vlm_safety_harness/results/main/E3/main_baseline_mirage_data_llava_ov/mirage_data_llava_ov/responses/ \
     --evaluator-type auto
 ```
 
@@ -2009,7 +2031,7 @@ conda activate mis_safety_llava && python scripts/run_eval_only.py \
 
 ```bash
 conda activate mis_safety && python scripts/run_capability.py --variants V1 V2 V3 V4 \
-  --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt
+  --baseline internvl3_5 --benchmarks mmstar mmmu muirbench blink mmt --cuda-visible-devices 0,1,2,3
 ```
 
 **Report — 各实验输出就绪后**

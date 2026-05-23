@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--benchmarks", nargs="+", default=CAPABILITY_BENCHMARKS)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--cuda-visible-devices", default=None, metavar="IDS",
+                   help="GPU IDs to expose (e.g. '0' or '0,1,2,3'); passed through to run_experiment.py")
     return p.parse_args()
 
 
@@ -97,6 +99,8 @@ def main() -> int:
             cmd += ["--limit", str(args.limit)]
         if args.dry_run:
             cmd += ["--dry-run"]
+        if args.cuda_visible_devices is not None:
+            cmd += ["--cuda-visible-devices", args.cuda_visible_devices]
         # V0 has no SFT; V1/V3 have SFT enabled; V2/V4 require general_data (gated above)
         print(f"[run E4] variant={variant} ({cfg_path.name})")
         print(f"  cmd: {' '.join(cmd)}")
